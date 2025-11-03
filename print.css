@@ -1,0 +1,135 @@
+/*
+ * =================================================================================
+ * LÚMEN - FOLHA DE ESTILO DE IMPRESSÃO (print.css) - SOLUÇÃO MULTI-CAMADAS
+ * Copyright (c) 2025 Paulo Gabriel de L. S.
+ * =================================================================================
+ * Esta versão adota uma abordagem de "defesa em profundidade" com múltiplas
+ * camadas de segurança para erradicar o bug da "segunda página em branco".
+ */
+
+@media print {
+
+    /* =================================================================================
+     * SOLUÇÃO 1: CONTENÇÃO ABSOLUTA E RESET AGRESSIVO
+     * Força a contenção do layout dentro dos limites da página, eliminando
+     * qualquer overflow, margem ou padding fantasma.
+     * ================================================================================= */
+    @page {
+        size: A4 portrait;
+        margin: 1.5cm;
+    }
+
+    html, body, #print-container {
+        width: 100%;
+        height: 100%;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body {
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        background-color: #fff !important;
+    }
+    
+    /* Esconde tudo, exceto o contêiner de impressão. */
+    body > *:not(#print-container) {
+        display: none !important;
+    }
+
+    #print-container, #print-container > * {
+        display: block !important;
+    }
+    
+    /* =================================================================================
+     * SOLUÇÃO 2: LÓGICA DE QUEBRA DE PÁGINA REVISTA
+     * Usa 'page-break-after' no penúltimo elemento, uma alternativa robusta
+     * que resolve o problema do item único.
+     * ================================================================================= */
+    .boletim-a4-wrapper:not(:last-child), 
+    .risk-report-a4-wrapper:not(:last-child) {
+        page-break-after: always;
+    }
+    
+    /* =================================================================================
+     * SOLUÇÃO 3: LAYOUT FLEXBOX INFALÍVEL
+     * Reforça a estrutura flexível para garantir que o conteúdo se ajuste
+     * perfeitamente à altura da página, empurrando o rodapé para o final.
+     * ================================================================================= */
+    .boletim-a4-wrapper, .risk-report-a4-wrapper {
+        width: 100%;
+        height: 100%; /* Força a ocupação total da área de impressão. */
+        display: flex; /* ATIVA O FLEXBOX NO CONTÊINER PRINCIPAL */
+        flex-direction: column;
+        overflow: hidden; /* Failsafe final contra overflow. */
+        
+        /* Resets visuais para garantir a aparência correta na impressão. */
+        padding: 0;
+        margin: 0;
+        border: none;
+        box-shadow: none;
+        color: #333;
+        font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    .boletim-container {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1; /* Ocupa todo o espaço do wrapper. */
+        min-height: 0; /* Correção essencial para flexbox aninhado. */
+    }
+    
+    .boletim-header, .boletim-student-info, .boletim-footer {
+        flex-shrink: 0; /* Impede que encolham. */
+    }
+
+    .boletim-main-content {
+        flex: 1 1 auto; /* A regra de ouro: cresce e encolhe para preencher o espaço. */
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    
+    .boletim-table {
+        flex-shrink: 0;
+    }
+
+    .boletim-chart-container-svg {
+        flex: 1 1 auto; /* O gráfico também se torna flexível. */
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+    
+    /* =================================================================================
+     * SOLUÇÃO 4: ESTILOS VISUAIS GARANTIDOS
+     * Assegura que a aparência na impressão seja uma cópia fiel da tela.
+     * ================================================================================= */
+    .boletim-header { border-bottom: 3px solid #0ea5e9; padding-bottom: 0.5rem; margin-bottom: 1rem; text-align: center; }
+    .boletim-header .school-name { font-size: 16pt; font-weight: 700; color: #0c4a6e; }
+    .boletim-header .teacher-name, .boletim-header .course-name { font-size: 10pt; color: #555; margin-top: 0.25rem; }
+    .boletim-student-info { display: flex; justify-content: space-between; padding: 0.5rem; margin-bottom: 1rem; background-color: #f0f9ff !important; border-radius: 6px; font-size: 10pt; }
+    .boletim-student-info span strong { color: #0c4a6e; }
+    .boletim-table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; word-wrap: break-word; }
+    .boletim-table th, .boletim-table td { border: 1px solid #e0e0e0; padding: 4px; text-align: center; vertical-align: middle; }
+    .boletim-table th { background-color: #e2e8f0 !important; font-weight: 600; color: #0c4a6e; white-space: normal; }
+    .boletim-table .book-name-cell { text-align: left; font-weight: 500; width: 20%; }
+    .boletim-table tbody tr:nth-child(odd) { background-color: #f8fafc !important; }
+    .boletim-table .grade-cell { width: 10%; }
+    .boletim-table input { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none; background-color: transparent !important; padding: 0.25rem; margin: 0; font-family: inherit; font-size: inherit; color: inherit; text-align: center; width: 100%; }
+    .boletim-chart-empty { color: #94a3b8; background-color: #f8fafc !important; border: 1px dashed #e0e0e0; padding: 2rem; text-align: center; margin-top: 1.5rem; flex-grow: 1; display: flex; align-items: center; justify-content: center; }
+    .boletim-chart-title { text-align: center; font-size: 12pt; font-weight: 600; color: #0c4a6e; margin-bottom: 1rem; }
+    svg { width: 100%; height: auto; max-height: 100%; }
+    .boletim-footer { padding-top: 0.5rem; border-top: 1px solid #e0e0e0; text-align: right; font-size: 8pt; color: #777; }
+    
+    /* Estilos para Relatório de Risco (Impressão) */
+    .risk-report-a4-wrapper .boletim-header { text-align: left; padding-bottom: 1rem; margin-bottom: 1rem; }
+    .risk-report-a4-wrapper .boletim-student-info { margin-bottom: 1.5rem; font-size: 11pt; }
+    .risk-report-section { margin-bottom: 2rem; }
+    .risk-report-section h3 { font-size: 14pt; color: #0c4a6e; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.25rem; margin-bottom: 1rem; }
+    .risk-report-table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+    .risk-report-table th, .risk-report-table td { border: 1px solid #e0e0e0; padding: 6px; text-align: left; vertical-align: top; }
+    .risk-report-table th { background-color: #f8fafc !important; font-weight: 600; }
+    .risk-report-feedback-box { background-color: #f8fafc !important; border: 1px solid #e0e0e0; border-radius: 6px; padding: 1rem; white-space: pre-wrap; min-height: 80px; }
+}
