@@ -529,7 +529,8 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
     const formatValueForInput = (val: number | null | undefined) => val !== null && val !== undefined ? String(val).replace('.', ',') : '';
 
     const tableRowsHTML = finalGradesData.map(grade => {
-        const canEdit = isEditableContext && grade.bookId === currentActiveBookId;
+        const canEdit = isEditableContext && 
+                        ((sala.tipo === 'Horista' && sala.inicioLivroHorista === 'meio') || grade.bookId === currentActiveBookId);
 
         const writtenCellContent = canEdit 
             ? '<input type="text" inputmode="decimal" value="' + formatValueForInput(grade.written) + '" />' 
@@ -569,9 +570,13 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
         return rowHTML;
     }).join('');
 
+    const schoolNameToDisplay = (sala.tipo === 'Horista' && sala.escolaHorista)
+                                ? sala.escolaHorista
+                                : state.settings.schoolName;
+
     let finalHTML = '<div class="boletim-a4-wrapper" data-aluno-id="' + aluno.id + '" data-sala-id="' + sala.id + '">';
     finalHTML += '<div class="boletim-container">';
-    finalHTML += '<header class="boletim-header"><div class="school-name">' + state.settings.schoolName + '</div><div class="teacher-name">Professor: ' + state.settings.teacherName + '</div><div class="course-name">Curso: Inglês</div></header>';
+    finalHTML += '<header class="boletim-header"><div class="school-name">' + schoolNameToDisplay + '</div><div class="teacher-name">Professor: ' + state.settings.teacherName + '</div><div class="course-name">Curso: Inglês</div></header>';
     finalHTML += '<section class="boletim-student-info"><span><strong>Aluno:</strong> ' + aluno.nomeCompleto + '</span><span><strong>Turma:</strong> ' + sala.nome + '</span><span><strong>CTR:</strong> ' + aluno.ctr + '</span></section>';
     finalHTML += '<div class="boletim-main-content">';
     finalHTML += '<table class="boletim-table">';

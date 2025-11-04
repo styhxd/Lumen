@@ -61,6 +61,7 @@ export let settings: Settings = {
     bonusValue: 3.50,
     minAlunos: 100,
     showFrequenciaValues: false,
+    valorHoraAula: 25.00,
 };
 
 // =================================================================================

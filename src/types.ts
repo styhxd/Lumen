@@ -27,7 +27,7 @@
  */
 export interface Progresso {
     livroId: number; // ID do livro ao qual este progresso se refere.
-    notaWritten: number | null; // Nota da prova escrita (pode ser nula se ainda не foi aplicada).
+    notaWritten: number | null; // Nota da prova escrita (pode ser nula se ainda não foi aplicada).
     notaOral: number | null; // Nota da prova oral.
     notaParticipation: number | null; // Nota de participação.
     manualAulasDadas?: number; // Contagem manual de aulas dadas, para sobrepor o cálculo automático.
@@ -84,6 +84,10 @@ export interface Sala {
     livros: Livro[]; // Lista de livros associados a esta sala.
     alunos: Aluno[]; // Lista de alunos matriculados na sala.
     finalizacao: Finalizacao | null; // Informações de finalização, se a sala estiver arquivada.
+    tipo: 'Regular' | 'Horista'; // Tipo da turma.
+    escolaHorista?: string; // Nome da escola para turmas horistas.
+    duracaoAulaHoras?: number; // Duração da aula em horas para turmas horistas.
+    inicioLivroHorista?: 'inicio' | 'meio'; // Ponto de início do livro para turmas horistas.
 }
 
 /**
@@ -175,6 +179,7 @@ export interface Settings {
     bonusValue: number; // Valor do bônus por aluno frequente.
     minAlunos: number; // Meta de alunos para atingir o bônus.
     showFrequenciaValues: boolean; // Flag para mostrar ou ocultar valores monetários na tela de frequência.
+    valorHoraAula: number; // Valor da hora/aula para turmas horistas.
 }
 
 /**

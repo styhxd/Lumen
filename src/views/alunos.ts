@@ -614,16 +614,27 @@ export function openSalaModal(sala: Sala | null = null) {
     const diasContainer = document.getElementById('sala-dias-semana') as HTMLElement;
     diasContainer.innerHTML = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"].map(dia => `<label><input type="checkbox" name="diasSemana" value="${dia}">${dia}</label>`).join('');
     
+    const salaTipoSelect = document.getElementById('sala-tipo') as HTMLSelectElement;
+    
     (document.getElementById('sala-modal-title') as HTMLElement).textContent = sala ? 'Editar Sala' : 'Adicionar Nova Sala';
     (document.getElementById('sala-id') as HTMLInputElement).value = sala ? sala.id.toString() : '';
     (document.getElementById('sala-nome') as HTMLInputElement).value = sala ? sala.nome : '';
     (document.getElementById('sala-data-inicio') as HTMLInputElement).value = sala ? sala.dataInicio : '';
     (document.getElementById('sala-data-fim') as HTMLInputElement).value = sala ? sala.dataFimPrevista : '';
     
+    // Set values for new fields
+    salaTipoSelect.value = sala?.tipo || 'Regular';
+    (document.getElementById('sala-escola-horista') as HTMLInputElement).value = sala?.escolaHorista || '';
+    (document.getElementById('sala-duracao-aula') as HTMLInputElement).value = sala?.duracaoAulaHoras?.toString() || '2';
+    (document.getElementById('sala-inicio-livro') as HTMLSelectElement).value = sala?.inicioLivroHorista || 'inicio';
+
     if(sala) sala.diasSemana.forEach(dia => {
         const check = diasContainer.querySelector(`input[value="${dia}"]`) as HTMLInputElement;
         if (check) check.checked = true;
     });
+    
+    // Trigger change event to set initial visibility of conditional fields
+    salaTipoSelect.dispatchEvent(new Event('change'));
     
     dom.salaModal.classList.add('visible');
 };
@@ -790,6 +801,18 @@ export function initAlunos() {
         }
     });
 
+    const salaTipoSelect = document.getElementById('sala-tipo') as HTMLSelectElement;
+    if (salaTipoSelect) {
+        salaTipoSelect.addEventListener('change', () => {
+            const horistaFields = document.getElementById('sala-horista-fields') as HTMLElement;
+            const isHorista = salaTipoSelect.value === 'Horista';
+            horistaFields.style.display = isHorista ? 'block' : 'none';
+            (document.getElementById('sala-escola-horista') as HTMLInputElement).required = isHorista;
+            (document.getElementById('sala-duracao-aula') as HTMLInputElement).required = isHorista;
+            (document.getElementById('sala-inicio-livro') as HTMLSelectElement).required = isHorista;
+        });
+    }
+
     // Listener para o envio do formulário da sala.
     dom.salaForm.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -798,17 +821,49 @@ export function initAlunos() {
         if (diasChecked.length === 0) {
             return utils.showToast('Selecione pelo menos um dia da semana.', 'error');
         }
-        const salaData = {
+        
+        const tipo = (document.getElementById('sala-tipo') as HTMLSelectElement).value as 'Regular' | 'Horista';
+
+        const salaData: Partial<Sala> = {
             nome: (document.getElementById('sala-nome') as HTMLInputElement).value.trim(),
             dataInicio: (document.getElementById('sala-data-inicio') as HTMLInputElement).value,
             dataFimPrevista: (document.getElementById('sala-data-fim') as HTMLInputElement).value,
             diasSemana: diasChecked,
+            tipo: tipo,
         };
+
+        if (tipo === 'Horista') {
+            salaData.escolaHorista = (document.getElementById('sala-escola-horista') as HTMLInputElement).value.trim();
+            salaData.duracaoAulaHoras = parseFloat((document.getElementById('sala-duracao-aula') as HTMLInputElement).value);
+            salaData.inicioLivroHorista = (document.getElementById('sala-inicio-livro') as HTMLSelectElement).value as 'inicio' | 'meio';
+        } else {
+            salaData.escolaHorista = undefined;
+            salaData.duracaoAulaHoras = undefined;
+            salaData.inicioLivroHorista = undefined;
+        }
+
         if(id) { // Editando
             const index = state.salas.findIndex(s => s.id === id);
-            if (index > -1) state.salas[index] = { ...state.salas[index], ...salaData };
+            if (index > -1) {
+                state.salas[index] = { ...state.salas[index], ...salaData };
+            }
         } else { // Criando
-            state.salas.push({ id: Date.now(), ...salaData, status: 'ativa', livros: [], alunos: [], finalizacao: null });
+            const newSala: Sala = { 
+                id: Date.now(),
+                nome: salaData.nome!,
+                dataInicio: salaData.dataInicio!,
+                dataFimPrevista: salaData.dataFimPrevista!,
+                diasSemana: salaData.diasSemana!,
+                tipo: salaData.tipo!,
+                status: 'ativa', 
+                livros: [], 
+                alunos: [], 
+                finalizacao: null,
+                escolaHorista: salaData.escolaHorista,
+                duracaoAulaHoras: salaData.duracaoAulaHoras,
+                inicioLivroHorista: salaData.inicioLivroHorista
+            };
+            state.salas.push(newSala);
         }
         state.setDataDirty(true);
         utils.showToast('Sala salva com sucesso!', 'success');

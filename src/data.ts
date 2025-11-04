@@ -264,6 +264,7 @@ export function loadAllData() {
         bonusValue: 3.50,
         minAlunos: 100,
         showFrequenciaValues: false,
+        valorHoraAula: 25.00,
     };
     Object.assign(state.settings, defaultSettings);
     
@@ -310,7 +311,7 @@ function handleExport() {
     // Estrutura o objeto de exportação com metadados para validação na importação.
     const exportData = { 
         appName: 'Lumen', 
-        version: '2.1.0', 
+        version: '2.1.1', // Updated version
         exportDate: new Date().toISOString(), 
         data: { 
             settings: state.settings,
@@ -402,7 +403,8 @@ function confirmImport() {
         const defaultSettings: Settings = { 
             teacherName: 'Paulo Gabriel de L. S.', 
             schoolName: 'Microcamp Mogi das Cruzes', 
-            bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false 
+            bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false,
+            valorHoraAula: 25.00
         };
         const importedSettings = dataToImport.settings || {};
         Object.assign(state.settings, defaultSettings, importedSettings);
@@ -413,6 +415,14 @@ function confirmImport() {
         state.provas.splice(0, state.provas.length, ...(dataToImport.provas || []));
         state.aulas.splice(0, state.aulas.length, ...(dataToImport.aulas || []));
         state.salas.splice(0, state.salas.length, ...(dataToImport.salas || []));
+        
+        // Garante compatibilidade com JSONs antigos que não têm o campo 'tipo'
+        state.salas.forEach(sala => {
+            if (!sala.tipo) {
+                sala.tipo = 'Regular';
+            }
+        });
+
         state.alunosParticulares.splice(0, state.alunosParticulares.length, ...(dataToImport.alunosParticulares || []));
         
         const eventosParaImportar = dataToImport.calendarioEventos || getInitialHolidays();

@@ -733,7 +733,7 @@ function renderClassPerformanceReport(salaId: number) {
             const percPresenca = totalAulasDadas > 0 ? (totalPresencas / totalAulasDadas) * 100 : 0;
             const notaFreq = percPresenca / 10;
             const notas = [progresso.notaWritten, progresso.notaOral, progresso.notaParticipation, notaFreq].filter(function(n) { return n !== null && n !== undefined; }) as number[];
-            const mediaFinal = notas.length > 0 ? notas.reduce(function(a, b) { return a + b; }, 0) / notas.length : null;
+            const mediaFinal = notas.length > 0 ? notas.reduce(function(a, b) { return a + b; }, 0) / notas.length : 0;
 
             booksData[livro.nome] = { media: mediaFinal, frequencia: percPresenca };
         });
@@ -1263,10 +1263,14 @@ function generateAndPrintRiskReports(selections: { aluno: Aluno, risks: any[] }[
                 </div>`
             : '';
 
+        const schoolNameToDisplay = (sala.tipo === 'Horista' && sala.escolaHorista)
+                                    ? sala.escolaHorista
+                                    : state.settings.schoolName;
+
         return `
             <div class="risk-report-a4-wrapper">
                 <header class="boletim-header">
-                    <div class="school-name">${state.settings.schoolName} - Relatório de Acompanhamento Pedagógico</div>
+                    <div class="school-name">${schoolNameToDisplay} - Relatório de Acompanhamento Pedagógico</div>
                     <div class="teacher-name">Professor: ${state.settings.teacherName}</div>
                 </header>
                 <section class="boletim-student-info">

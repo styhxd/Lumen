@@ -53,16 +53,141 @@ function isSalaEffectivelyActive(sala: Sala, monthYear: string): boolean {
 }
 
 /**
- * Renderiza a view principal de Frequência e Bônus.
- * 
- * Esta função orquestra a exibição do painel de bônus e dos botões de risco.
- * Ela primeiro calcula os dados de bônus para o mês selecionado e depois
- * constrói o HTML da interface, populando-a com os dados calculados.
- * 
- * @param selectedMonthYear O mês a ser exibido, no formato "YYYY-MM". Se nulo,
- *                          usa o mês atual como padrão.
+ * Função de despacho principal para a view de Frequência.
+ * Verifica a existência de turmas horistas e renderiza a interface apropriada.
+ * @param selectedMonthYear O mês a ser exibido, no formato "YYYY-MM".
  */
 export function renderFrequenciaView(selectedMonthYear: string | null = null) {
+    const hasHoristaTurmas = state.salas.some(s => s.tipo === 'Horista');
+
+    if (hasHoristaTurmas) {
+        // Usa o novo layout de 3 cards
+        frequenciaContentBody.classList.remove('frequencia-grid');
+        renderNewFrequenciaView(selectedMonthYear);
+    } else {
+        // Usa o layout antigo
+        frequenciaContentBody.classList.add('frequencia-grid');
+        renderLegacyFrequenciaView(selectedMonthYear);
+    }
+}
+
+/**
+ * Renderiza a nova interface de Frequência com 3 cards para turmas Regulares e Horistas.
+ * @param selectedMonthYear O mês a ser exibido, no formato "YYYY-MM".
+ */
+function renderNewFrequenciaView(selectedMonthYear: string | null = null) {
+    const today = new Date();
+    const currentMonthYear = selectedMonthYear || `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    // --- CÁLCULOS ---
+    
+    // 1. Bônus de Turmas Regulares
+    const regularBonusData = calculateBonusForMonth(currentMonthYear, 'Regular');
+
+    // 2. Bônus de Turmas Horistas
+    const aulasDoMes = state.aulas.filter(a => a.chamadaRealizada && !a.isNoClassEvent && a.date.startsWith(currentMonthYear));
+    let hourlyBonusTotal = 0;
+    let totalHoras = 0;
+    const valorHoraAula = state.settings.valorHoraAula || 0;
+    const aulasHoristasDadas: Aula[] = [];
+
+    aulasDoMes.forEach(aula => {
+        const sala = state.salas.find(s => s.nome === aula.turma);
+        if (sala && sala.tipo === 'Horista' && sala.duracaoAulaHoras) {
+            hourlyBonusTotal += sala.duracaoAulaHoras * valorHoraAula;
+            totalHoras += sala.duracaoAulaHoras;
+            aulasHoristasDadas.push(aula);
+        }
+    });
+
+    // 3. Bônus Total
+    const totalBonus = regularBonusData.bonusTotal + hourlyBonusTotal;
+
+    // --- RENDERIZAÇÃO ---
+    const visibilityClass = state.settings.showFrequenciaValues ? '' : 'hidden';
+    frequenciaToggleVisibilityBtn.innerHTML = state.settings.showFrequenciaValues ? utils.eyeOffIcon : utils.eyeIcon;
+
+    const availableMonths = [...new Set(state.aulas.filter(a => a.chamadaRealizada).map(a => a.date.substring(0, 7)))].sort().reverse();
+    const currentMonthString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+    if (!availableMonths.includes(currentMonthString)) {
+        availableMonths.unshift(currentMonthString);
+    }
+    const monthOptionsHTML = [...new Set(availableMonths)].map(my => {
+        const [year, month] = my.split('-');
+        const label = new Date(Number(year), Number(month) - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        return `<option value="${my}" ${my === currentMonthYear ? 'selected' : ''}>${label.charAt(0).toUpperCase() + label.slice(1)}</option>`;
+    }).join('');
+    
+    const monthSelectorHTML = `<div class="panel-header" style="width: 100%;"><span class="panel-title">Análise Financeira</span><div class="filter-group" style="min-width: 200px;"><select id="frequencia-month-select" class="filter-input">${monthOptionsHTML}</select></div></div>`;
+    
+    frequenciaContentBody.innerHTML = `
+        ${monthSelectorHTML}
+        <div class="page-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); margin-top: 1.5rem;">
+            <div class="bonus-panel">
+                <div class="panel-header"><span class="panel-title">Bônus de Alunos (Regulares)</span></div>
+                <div class="bonus-display">
+                    <h3 class="bonus-value ${visibilityClass}">R$ ${regularBonusData.bonusTotal.toFixed(2).replace('.', ',')}</h3>
+                    <p class="bonus-status ${regularBonusData.metaAtingida ? 'success' : 'fail'}">${regularBonusData.metaAtingida ? 'META ATINGIDA' : 'META NÃO ATINGIDA'}</p>
+                </div>
+                <div class="metrics-grid">
+                    <div class="metric-item"><div class="metric-label">Alunos Frequentes</div><div class="metric-value">${regularBonusData.frequentAlunosCount}</div></div>
+                    <div class="metric-item"><div class="metric-label">Meta de Alunos</div><div class="metric-value">${state.settings.minAlunos}</div></div>
+                </div>
+            </div>
+
+            <div class="bonus-panel">
+                <div class="panel-header"><span class="panel-title">Bônus Hora/Aula (Horistas)</span></div>
+                <div class="bonus-display">
+                    <h3 class="bonus-value ${visibilityClass}">R$ ${hourlyBonusTotal.toFixed(2).replace('.', ',')}</h3>
+                    <p class="bonus-status success">CÁLCULO DIRETO</p>
+                </div>
+                <div class="metrics-grid">
+                     <div class="metric-item"><div class="metric-label">Aulas Dadas</div><div class="metric-value">${aulasHoristasDadas.length}</div></div>
+                     <div class="metric-item"><div class="metric-label">Total de Horas</div><div class="metric-value">${totalHoras.toFixed(1).replace('.',',')}h</div></div>
+                </div>
+            </div>
+            
+            <div class="bonus-panel">
+                 <div class="panel-header"><span class="panel-title">Bonificação Total</span></div>
+                <div class="bonus-display">
+                    <h3 class="bonus-value ${visibilityClass}" style="color: var(--success-color);">R$ ${totalBonus.toFixed(2).replace('.', ',')}</h3>
+                    <p class="bonus-status success">TOTAL DO MÊS</p>
+                </div>
+                 <div class="metrics-grid" style="grid-template-columns: 1fr;">
+                     <div class="metric-item"><div class="metric-label">Bônus Regular + Bônus Horista</div><div class="metric-value ${visibilityClass}">R$ ${regularBonusData.bonusTotal.toFixed(2).replace('.', ',')} + R$ ${hourlyBonusTotal.toFixed(2).replace('.', ',')}</div></div>
+                </div>
+            </div>
+        </div>
+         <div class="risk-panel" style="margin-top: 1.5rem;">
+            <button class="btn" id="risco-modulo-btn">
+                <svg class="btn-icon-svg" fill="currentColor" viewBox="0 0 24 24"><path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,2.08L19,6.05V11C19,15.56 16.03,19.78 12,20.92C7.97,19.78 5,15.56 5,11V6.05L12,2.08M11,7H13V13H11V7M11,15H13V17H11V15Z"></path></svg>
+                <div class="risk-btn-text-content">
+                    <span class="btn-text">Risco de Repetir Módulo</span>
+                    <span class="risk-desc">Alunos com menos de 50% de presença no livro atual.</span>
+                </div>
+            </button>
+            <button class="btn" id="risco-bonus-btn">
+                <svg class="btn-icon-svg" fill="currentColor" viewBox="0 0 24 24"><path d="M16 18l2.29-2.29-4.88-4.88-4 4L2 7.41 3.41 6l6 6 4-4 6.3 6.29L22 12v6h-6z"></path></svg>
+                <div class="risk-btn-text-content">
+                    <span class="btn-text">Risco de Bônus (Mês)</span>
+                    <span class="risk-desc">Alunos com menos de 50% de presença no mês selecionado.</span>
+                </div>
+            </button>
+        </div>
+    `;
+
+    frequenciaContentBody.querySelector('#frequencia-month-select')?.addEventListener('change', (e) => renderFrequenciaView((e.target as HTMLSelectElement).value));
+    frequenciaContentBody.querySelector('#risco-modulo-btn')?.addEventListener('click', () => openRiscoAlunosModal('modulo'));
+    frequenciaContentBody.querySelector('#risco-bonus-btn')?.addEventListener('click', () => openRiscoAlunosModal('bonus', currentMonthYear));
+}
+
+
+/**
+ * Renderiza a view de Frequência e Bônus no formato antigo (legado).
+ * Esta função é chamada quando não existem turmas do tipo "Horista".
+ * @param selectedMonthYear O mês a ser exibido, no formato "YYYY-MM".
+ */
+function renderLegacyFrequenciaView(selectedMonthYear: string | null = null) {
     const today = new Date();
     const currentActualMonthYear = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
     const currentMonthYear = selectedMonthYear || currentActualMonthYear;
@@ -140,32 +265,31 @@ export function renderFrequenciaView(selectedMonthYear: string | null = null) {
     frequenciaContentBody.querySelector('#frequencia-month-select')?.addEventListener('change', (e) => renderFrequenciaView((e.target as HTMLSelectElement).value));
     frequenciaContentBody.querySelector('#risco-modulo-btn')?.addEventListener('click', () => openRiscoAlunosModal('modulo'));
     frequenciaContentBody.querySelector('#risco-bonus-btn')?.addEventListener('click', () => openRiscoAlunosModal('bonus', currentMonthYear));
-};
+}
+
 
 /**
  * Calcula os dados de bônus para um mês específico.
  * 
- * Esta é a função de lógica de negócio mais importante do módulo. Ela segue os seguintes passos:
- * 1. Filtra as salas que estavam ativas no mês.
- * 2. Obtém uma lista única de todos os alunos ativos nessas salas.
- * 3. Filtra todas as aulas que ocorreram no mês.
- * 4. Para cada aluno, verifica sua frequência em cada livro que ele cursou no mês.
- * 5. Se o aluno tiver 50% ou mais de frequência em PELO MENOS UM desses livros, ele é considerado "frequente".
- * 6. Conta o total de alunos frequentes e calcula o bônus se a meta for atingida.
- * 
  * @param monthYear O mês para o qual o bônus será calculado ("YYYY-MM").
- * @returns Um objeto com os dados de bônus, incluindo o bônus total, contagem de alunos frequentes no mês, total de alunos ativos atualmente, total de alunos ativos no mês de referência e se a meta foi atingida.
+ * @param tipoFiltro Opcional. Filtra o cálculo para turmas 'Regular' ou 'Horista'.
+ * @returns Um objeto com os dados de bônus.
  */
-function calculateBonusForMonth(monthYear: string) {
+function calculateBonusForMonth(monthYear: string, tipoFiltro?: 'Regular' | 'Horista') {
     const activeStudentStatuses = ["Ativo", "Nivelamento", "Transferido (interno)"];
-    const effectivelyActiveSalas = state.salas.filter(s => isSalaEffectivelyActive(s, monthYear));
+    
+    let effectivelyActiveSalas = state.salas.filter(s => isSalaEffectivelyActive(s, monthYear));
+    if (tipoFiltro) {
+        effectivelyActiveSalas = effectivelyActiveSalas.filter(s => s.tipo === tipoFiltro);
+    }
+
     const studentsForBonusCalc = effectivelyActiveSalas
         .flatMap(s => s.alunos)
         .filter(aluno => activeStudentStatuses.includes(aluno.statusMatricula))
         .filter((aluno, index, self) => index === self.findIndex(a => a.id === aluno.id));
 
     const allCurrentActiveStudents = state.salas
-        .filter(s => s.status === 'ativa')
+        .filter(s => s.status === 'ativa' && (!tipoFiltro || s.tipo === tipoFiltro))
         .flatMap(s => s.alunos)
         .filter(aluno => activeStudentStatuses.includes(aluno.statusMatricula))
         .filter((aluno, index, self) => index === self.findIndex(a => a.id === aluno.id));

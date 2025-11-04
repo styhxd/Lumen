@@ -639,10 +639,17 @@
             <h2 id="sala-modal-title" class="view-title">Adicionar Nova Sala</h2>
             <form id="sala-form">
                 <input type="hidden" id="sala-id">
-                <div class="form-grid">
-                    <div class="form-group full-width">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
                         <label for="sala-nome">Nome da Sala</label>
                         <input type="text" id="sala-nome" placeholder="Ex: SQA20h" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sala-tipo">Tipo de Turma</label>
+                        <select id="sala-tipo" required>
+                            <option value="Regular">Regular</option>
+                            <option value="Horista">Horista</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="sala-data-inicio">Data de Início</label>
@@ -655,6 +662,26 @@
                     <div class="form-group full-width">
                         <label>Dias da Semana</label>
                         <div id="sala-dias-semana" class="checkbox-group">
+                        </div>
+                    </div>
+                </div>
+                <div id="sala-horista-fields" style="display: none; border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;">
+                    <h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Detalhes da Turma Horista</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="sala-escola-horista">Nome da Escola</label>
+                            <input type="text" id="sala-escola-horista" placeholder="Ex: Colégio ABC">
+                        </div>
+                        <div class="form-group">
+                            <label for="sala-duracao-aula">Duração da Aula (horas)</label>
+                            <input type="number" id="sala-duracao-aula" min="0.5" step="0.5" value="2">
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="sala-inicio-livro">Início do Livro</label>
+                            <select id="sala-inicio-livro">
+                                <option value="inicio">Começa do Início</option>
+                                <option value="meio">Começa do Meio do Livro</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -971,6 +998,13 @@
                     <div class="form-group">
                         <label for="setting-min-alunos">Mínimo de Alunos Frequentes para Bônus</label>
                         <input type="number" id="setting-min-alunos" step="1" min="0" required>
+                    </div>
+                </div>
+                <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--primary-blue); margin: 1.5rem 0 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">Configurações de Turmas Horistas</h3>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="setting-valor-hora-aula">Valor da Hora/Aula (R$)</label>
+                        <input type="number" id="setting-valor-hora-aula" step="0.01" min="0" required>
                     </div>
                 </div>
                 <div class="modal-actions">

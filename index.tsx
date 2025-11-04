@@ -513,6 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
         (dom.settingsForm.querySelector('#setting-school-name') as HTMLInputElement).value = state.settings.schoolName;
         (dom.settingsForm.querySelector('#setting-bonus-value') as HTMLInputElement).value = state.settings.bonusValue.toString();
         (dom.settingsForm.querySelector('#setting-min-alunos') as HTMLInputElement).value = state.settings.minAlunos.toString();
+        (dom.settingsForm.querySelector('#setting-valor-hora-aula') as HTMLInputElement).value = state.settings.valorHoraAula.toString();
         dom.settingsModal.classList.add('visible');
     };
 
@@ -532,6 +533,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.settings.schoolName = (dom.settingsForm.querySelector('#setting-school-name') as HTMLInputElement).value.trim();
         state.settings.bonusValue = parseFloat((dom.settingsForm.querySelector('#setting-bonus-value') as HTMLInputElement).value);
         state.settings.minAlunos = parseInt((dom.settingsForm.querySelector('#setting-min-alunos') as HTMLInputElement).value, 10);
+        state.settings.valorHoraAula = parseFloat((dom.settingsForm.querySelector('#setting-valor-hora-aula') as HTMLInputElement).value);
         
         // Atualiza a UI imediatamente com os novos nomes.
         dom.schoolNameEl.textContent = state.settings.schoolName;
