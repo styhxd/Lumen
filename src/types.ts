@@ -145,6 +145,9 @@ export interface Aula {
     anotacoes: string; // Observações gerais.
     chamadaRealizada: boolean; // Indica se a chamada já foi feita.
     presentes: number[]; // Array de IDs dos alunos presentes.
+    isFreelanceHorista?: boolean; // Flag para aula horista avulsa
+    duracaoAulaHoras?: number;    // Duração para aula horista avulsa
+    escolaHorista?: string;       // Escola para aula horista avulsa
 }
 
 /**

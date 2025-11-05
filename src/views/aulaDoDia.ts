@@ -49,6 +49,30 @@ let isAulaFormDirty = false;
 // =================================================================================
 
 /**
+ * Gera o HTML para o card de uma aula horista avulsa.
+ * @param aula O objeto da aula a ser renderizado.
+ * @returns Uma string HTML com o card da aula.
+ */
+function getFreelanceAulaCardHTML(aula: Aula): string {
+    return `
+    <div class="freelance-aula-card" data-id="${aula.id}" data-type="aula">
+        <div class="freelance-aula-header">
+            <h4 class="freelance-aula-title">${aula.turma}</h4>
+            <p class="freelance-aula-subtitle">${aula.escolaHorista ? `${aula.escolaHorista} | ` : ''}${aula.duracaoAulaHoras} hora(s)</p>
+        </div>
+        <div class="freelance-aula-details">
+            <strong>Conteúdo:</strong> ${aula.aulaHoje}
+            ${aula.anotacoes ? `<br><strong>Anotações:</strong> ${aula.anotacoes}` : ''}
+        </div>
+        <div class="aviso-actions">
+            <button class="btn btn-icon edit-btn" aria-label="Editar" title="Editar"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg></button>
+            <button class="btn btn-icon delete-btn" aria-label="Excluir" title="Excluir"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg></button>
+        </div>
+    </div>`;
+}
+
+
+/**
  * Renderiza a visualização principal da "Aula do Dia", exibindo um calendário
  * com todas as aulas planejadas para o mês corrente.
  * A função constrói dinamicamente a lista de dias do mês, busca no estado global
@@ -105,6 +129,10 @@ export function renderAulaDoDia() {
         if (aulasDoDia.length > 0) {
             // Se houver aulas, mapeia cada uma para seu respectivo HTML de "card".
             aulasHTML = aulasDoDia.map(aula => {
+                // Lógica para renderizar uma aula horista avulsa.
+                if (aula.isFreelanceHorista) {
+                    return getFreelanceAulaCardHTML(aula);
+                }
                 // Lógica para renderizar um evento de "Sem Aula".
                 if (aula.isNoClassEvent) {
                     return `<div class="sem-aula-card" data-id="${aula.id}" data-type="aula"><div class="sem-aula-info"><div class="sem-aula-tipo">${aula.eventType}</div><div class="sem-aula-desc">${aula.tema}</div></div><div class="aviso-actions"><button class="btn btn-icon edit-btn" aria-label="Editar" title="Editar"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg></button><button class="btn btn-icon delete-btn" aria-label="Excluir" title="Excluir"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg></button></div></div>`;
@@ -204,6 +232,9 @@ export function renderAulasArquivadas(selectedMonth: string | null = null) {
         let aulasHTML = '';
         if (aulasDoDia.length > 0) {
             aulasHTML = aulasDoDia.map(aula => {
+                if (aula.isFreelanceHorista) {
+                    return getFreelanceAulaCardHTML(aula);
+                }
                  if (aula.isNoClassEvent) return `<div class="sem-aula-card" data-id="${aula.id}" data-type="aula"><div class="sem-aula-info"><div class="sem-aula-tipo">${aula.eventType}</div><div class="sem-aula-desc">${aula.tema}</div></div><div class="aviso-actions"><button class="btn btn-icon edit-btn" aria-label="Editar" title="Editar"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg></button><button class="btn btn-icon delete-btn" aria-label="Excluir" title="Excluir"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg></button></div></div>`;
                 const chamadaFeita = aula.chamadaRealizada;
                 const chamadaBtnHTML = `<button class="btn chamada-btn ${chamadaFeita ? 'chamada-realizada' : 'chamada-pendente'}" data-aula-id="${aula.id}"><span class="btn-text">${chamadaFeita ? 'Editar Chamada' : 'Fazer Chamada'}</span></button>`;
@@ -288,6 +319,26 @@ export function openAulaModal(aula: Aula | null = null, date: string | null = nu
 };
 
 /**
+ * Abre o modal para registrar uma nova aula horista avulsa ou editar uma existente.
+ * @param aula - O objeto da aula a ser editada, ou `null` para criar uma nova.
+ * @param date - A data a ser pré-selecionada, útil ao criar a partir do calendário.
+ */
+export function openFreelanceAulaModal(aula: Aula | null = null, date: string | null = null) {
+    dom.freelanceAulaForm.reset();
+    (document.getElementById('freelance-aula-modal-title') as HTMLElement).textContent = aula ? 'Editar Aula Horista Avulsa' : 'Registrar Aula Horista Avulsa';
+
+    (document.getElementById('freelance-aula-id') as HTMLInputElement).value = aula?.id.toString() || '';
+    (document.getElementById('freelance-aula-date') as HTMLInputElement).value = aula?.date || date || new Date().toISOString().split('T')[0];
+    (document.getElementById('freelance-aula-duracao') as HTMLInputElement).value = aula?.duracaoAulaHoras?.toString() || '1.5';
+    (document.getElementById('freelance-aula-turma') as HTMLInputElement).value = aula?.turma || '';
+    (document.getElementById('freelance-aula-escola') as HTMLInputElement).value = aula?.escolaHorista || '';
+    (document.getElementById('freelance-aula-conteudo') as HTMLTextAreaElement).value = aula?.aulaHoje || '';
+    (document.getElementById('freelance-aula-anotacoes') as HTMLTextAreaElement).value = aula?.anotacoes || '';
+
+    dom.freelanceAulaModal.classList.add('visible');
+}
+
+/**
  * Abre o modal de chamada para registrar a presença dos alunos em uma aula específica.
  * @param aulaId - O ID da aula para a qual a chamada será feita.
  */
@@ -348,6 +399,10 @@ function closeAulaModal() {
     isAulaFormDirty = false; // Reseta a flag ao fechar.
     dom.aulaDiaModal.classList.remove('visible');
 };
+
+function closeFreelanceAulaModal() {
+    dom.freelanceAulaModal.classList.remove('visible');
+}
 
 /**
  * Função de inicialização do módulo. Configura todos os event listeners
@@ -519,5 +574,79 @@ export function initAulaDoDia() {
             }
             return;
         }
+    });
+
+    // Listener para o novo botão de aula horista avulsa
+    document.getElementById('add-freelance-aula-btn')?.addEventListener('click', () => openFreelanceAulaModal());
+    // Listener para fechar o modal de aula horista avulsa
+    dom.freelanceAulaModal.addEventListener('click', (e) => {
+        if (e.target === dom.freelanceAulaModal || (e.target as HTMLElement).closest('#freelance-aula-cancel-btn')) {
+            closeFreelanceAulaModal();
+        }
+    });
+    // Listener para o envio do formulário de aula horista avulsa
+    dom.freelanceAulaForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const saveBtn = dom.freelanceAulaForm.querySelector('.btn-primary') as HTMLButtonElement;
+        utils.setButtonLoading(saveBtn, true);
+    
+        const id = (document.getElementById('freelance-aula-id') as HTMLInputElement).value;
+        
+        // Verificação de segurança: A duração deve ser um número positivo.
+        const duracao = parseFloat((document.getElementById('freelance-aula-duracao') as HTMLInputElement).value);
+        if (isNaN(duracao) || duracao <= 0) {
+            utils.showToast('A duração da aula deve ser um número positivo.', 'error');
+            utils.setButtonLoading(saveBtn, false);
+            return;
+        }
+    
+        const newAulaData: Partial<Aula> = {
+            date: (document.getElementById('freelance-aula-date') as HTMLInputElement).value,
+            turma: (document.getElementById('freelance-aula-turma') as HTMLInputElement).value.trim(),
+            aulaHoje: (document.getElementById('freelance-aula-conteudo') as HTMLTextAreaElement).value.trim(),
+            escolaHorista: (document.getElementById('freelance-aula-escola') as HTMLInputElement).value.trim() || undefined,
+            anotacoes: (document.getElementById('freelance-aula-anotacoes') as HTMLTextAreaElement).value.trim() || undefined,
+            duracaoAulaHoras: duracao,
+            isFreelanceHorista: true,
+            // Preenche os campos restantes com valores padrão para satisfazer a tipagem.
+            isNoClassEvent: false,
+            eventType: '',
+            tema: `Aula Horista: ${(document.getElementById('freelance-aula-turma') as HTMLInputElement).value.trim()}`,
+            linguagem: '',
+            livroOndeParou: '',
+            ondeParou: '',
+            livroAulaHoje: '',
+            aulaSeguinte: '',
+        };
+    
+        if (id) {
+            const index = state.aulas.findIndex(a => a.id === Number(id));
+            if (index > -1) {
+                // Verificação de segurança: não permite que uma aula regular seja sobrescrita como avulsa.
+                if (!state.aulas[index].isFreelanceHorista) {
+                    console.error("Tentativa de sobrescrever uma aula regular com dados de aula avulsa. Ação abortada.", state.aulas[index]);
+                    utils.showToast('Erro: Tentativa de sobrescrever uma aula regular.', 'error');
+                    utils.setButtonLoading(saveBtn, false);
+                    return;
+                }
+                state.aulas[index] = { ...state.aulas[index], ...newAulaData };
+            }
+        } else {
+            state.aulas.push({ 
+                id: Date.now(), 
+                ...newAulaData,
+                chamadaRealizada: true, // Aulas avulsas não têm chamada, então são consideradas "realizadas".
+                presentes: [] 
+            } as Aula);
+        }
+        
+        setTimeout(() => {
+            state.setDataDirty(true);
+            renderAulaDoDia();
+            renderAulasArquivadas(archiveMonthSelect.value);
+            closeFreelanceAulaModal();
+            utils.setButtonLoading(saveBtn, false);
+            utils.showToast('Aula horista salva com sucesso!', 'success');
+        }, 300);
     });
 }

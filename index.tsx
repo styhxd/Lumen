@@ -32,7 +32,7 @@ import { initModals, handleDeleteClick, handleFinalizeClick } from './src/modals
 // Módulos de cada View (tela) da aplicação
 import { initAlunos, openSalaModal, openLivroModal, openAlunoModal, setAlunosViewState, renderAlunosView, renderSalasFinalizadasList, renderAlunosExcluidosList } from './src/views/alunos.ts';
 import { initAulasExtras, openAlunoParticularModal, openAulaParticularLessonModal, renderAulasExtrasView, setAulasExtrasViewState } from './src/views/aulasExtras.ts';
-import { initAulaDoDia, openAulaModal, openChamadaModal, renderAulaDoDia, renderAulasArquivadas } from './src/views/aulaDoDia.ts';
+import { initAulaDoDia, openAulaModal, openChamadaModal, renderAulaDoDia, renderAulasArquivadas, openFreelanceAulaModal } from './src/views/aulaDoDia.ts';
 import { initAvisos, openAvisoModal, renderAvisos } from './src/views/avisos.ts';
 import { initFrequencia, renderFrequenciaView } from './src/views/frequencia.ts';
 import { initProvas, openProvaModal, renderProvas } from './src/views/provas.ts';
@@ -192,7 +192,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'aviso': openAvisoModal(state.avisos.find(a => a.id === id) || null); break;
                 case 'recurso': openRecursoModal(state.recursos.find(r => r.id === id) || null); break;
                 case 'prova': openProvaModal(state.provas.find(p => p.id === id) || null); break;
-                case 'aula': openAulaModal(state.aulas.find(a => a.id === id) || null); break;
+                case 'aula': {
+                    const aula = state.aulas.find(a => a.id === id);
+                    if (aula) {
+                        if (aula.isFreelanceHorista) {
+                            openFreelanceAulaModal(aula);
+                        } else {
+                            openAulaModal(aula);
+                        }
+                    }
+                    break;
+                }
                 case 'sala': openSalaModal(state.salas.find(s => s.id === id) || null); break;
                 case 'calendarioEvento': openCalendarioModal(state.calendarioEventos.find(ev => ev.id === id) || null); break;
                 case 'livro': {
@@ -470,7 +480,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 setAlunosViewState({ view: 'livro_details', salaId: Number(item.dataset.salaId), livroId: Number(item.dataset.livroId) });
                 break;
             case 'aula':
-                openAulaModal(state.aulas.find(a => a.id === Number(item.dataset.aulaId)) || null);
+                const aula = state.aulas.find(a => a.id === Number(item.dataset.aulaId));
+                if (aula) {
+                    if (aula.isFreelanceHorista) {
+                        openFreelanceAulaModal(aula);
+                    } else {
+                        openAulaModal(aula);
+                    }
+                }
                 break;
             case 'recurso':
                 switchView('recursos');

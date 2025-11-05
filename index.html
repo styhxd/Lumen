@@ -249,6 +249,10 @@
                             <svg class="btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                             <span class="btn-text">Planejar Aula</span>
                         </button>
+                        <button id="add-freelance-aula-btn" class="btn btn-large">
+                            <svg class="btn-icon-svg" fill="currentColor" viewBox="0 0 24 24" width="20" height="20"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"></path></svg>
+                            <span class="btn-text">Aula Horista Avulsa</span>
+                        </button>
                         <button id="aulas-arquivadas-btn" data-view="aulasArquivadas" class="btn btn-large">
                              <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-8h14V7H7v2z"></path></svg>
                             <span class="btn-text">Aulas Arquivadas</span>
@@ -559,6 +563,48 @@
                     <button type="button" id="aula-dia-cancel-btn" class="btn">Cancelar</button>
                     <button type="submit" id="aula-dia-save-btn" class="btn btn-primary">
                         <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="freelance-aula-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h2 id="freelance-aula-modal-title" class="view-title">Registrar Aula Horista Avulsa</h2>
+            <form id="freelance-aula-form">
+                <input type="hidden" id="freelance-aula-id">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
+                        <label for="freelance-aula-date">Data</label>
+                        <input type="date" id="freelance-aula-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="freelance-aula-duracao">Duração (horas)</label>
+                        <input type="number" id="freelance-aula-duracao" min="0.5" step="0.5" value="1.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="freelance-aula-turma">Turma / Referência</label>
+                        <input type="text" id="freelance-aula-turma" placeholder="Ex: Reforço Maria" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="freelance-aula-escola">Escola (Opcional)</label>
+                        <input type="text" id="freelance-aula-escola" placeholder="Ex: Colégio XYZ">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="freelance-aula-conteudo">Conteúdo Aplicado</label>
+                    <textarea id="freelance-aula-conteudo" placeholder="Descreva as atividades e tópicos abordados..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="freelance-aula-anotacoes">Anotações (Opcional)</label>
+                    <textarea id="freelance-aula-anotacoes" placeholder="Observações sobre a aula, desempenho, etc." style="min-height: 80px;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="freelance-aula-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="freelance-aula-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar Aula</span>
                         <div class="spinner"></div>
                     </button>
                 </div>

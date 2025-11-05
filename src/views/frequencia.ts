@@ -59,8 +59,9 @@ function isSalaEffectivelyActive(sala: Sala, monthYear: string): boolean {
  */
 export function renderFrequenciaView(selectedMonthYear: string | null = null) {
     const hasHoristaTurmas = state.salas.some(s => s.tipo === 'Horista');
+    const hasFreelanceAulas = state.aulas.some(a => a.isFreelanceHorista);
 
-    if (hasHoristaTurmas) {
+    if (hasHoristaTurmas || hasFreelanceAulas) {
         // Usa o novo layout de 3 cards
         frequenciaContentBody.classList.remove('frequencia-grid');
         renderNewFrequenciaView(selectedMonthYear);
@@ -92,11 +93,17 @@ function renderNewFrequenciaView(selectedMonthYear: string | null = null) {
     const aulasHoristasDadas: Aula[] = [];
 
     aulasDoMes.forEach(aula => {
-        const sala = state.salas.find(s => s.nome === aula.turma);
-        if (sala && sala.tipo === 'Horista' && sala.duracaoAulaHoras) {
-            hourlyBonusTotal += sala.duracaoAulaHoras * valorHoraAula;
-            totalHoras += sala.duracaoAulaHoras;
+        if (aula.isFreelanceHorista && aula.duracaoAulaHoras) {
+            hourlyBonusTotal += aula.duracaoAulaHoras * valorHoraAula;
+            totalHoras += aula.duracaoAulaHoras;
             aulasHoristasDadas.push(aula);
+        } else {
+            const sala = state.salas.find(s => s.nome === aula.turma);
+            if (sala && sala.tipo === 'Horista' && sala.duracaoAulaHoras) {
+                hourlyBonusTotal += sala.duracaoAulaHoras * valorHoraAula;
+                totalHoras += sala.duracaoAulaHoras;
+                aulasHoristasDadas.push(aula);
+            }
         }
     });
 
@@ -107,7 +114,7 @@ function renderNewFrequenciaView(selectedMonthYear: string | null = null) {
     const visibilityClass = state.settings.showFrequenciaValues ? '' : 'hidden';
     frequenciaToggleVisibilityBtn.innerHTML = state.settings.showFrequenciaValues ? utils.eyeOffIcon : utils.eyeIcon;
 
-    const availableMonths = [...new Set(state.aulas.filter(a => a.chamadaRealizada).map(a => a.date.substring(0, 7)))].sort().reverse();
+    const availableMonths = [...new Set(state.aulas.filter(a => a.chamadaRealizada || a.isFreelanceHorista).map(a => a.date.substring(0, 7)))].sort().reverse();
     const currentMonthString = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
     if (!availableMonths.includes(currentMonthString)) {
         availableMonths.unshift(currentMonthString);
