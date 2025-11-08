@@ -107,14 +107,29 @@ export function renderNotasView() {
  */
 function renderSalasListForNotas() {
     const activeSalas = state.salas.filter(s => s.status === 'ativa');
-    const diasOrdem = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-    // Ordena as salas por dia da semana e nome para uma exibição consistente.
-    activeSalas.sort((a,b) => {
-        const diaA = Math.min(...a.diasSemana.map(d => diasOrdem.indexOf(d)));
-        const diaB = Math.min(...b.diasSemana.map(d => diasOrdem.indexOf(d)));
-        if (diaA !== diaB) return diaA - diaB;
-        return a.nome.localeCompare(b.nome);
+
+    const salasBySchool: { [school: string]: Sala[] } = activeSalas.reduce((acc, sala) => {
+        let schoolName: string;
+        if (sala.tipo === 'Horista') {
+            schoolName = sala.escolaHorista?.trim() || 'Outras Escolas';
+        } else { // 'Regular'
+            schoolName = state.settings.schoolName;
+        }
+        
+        if (!acc[schoolName]) {
+            acc[schoolName] = [];
+        }
+        acc[schoolName].push(sala);
+        return acc;
+    }, {} as { [school: string]: Sala[] });
+
+    const sortedSchools = Object.keys(salasBySchool).sort((a, b) => {
+        if (a === state.settings.schoolName) return -1;
+        if (b === state.settings.schoolName) return 1;
+        return a.localeCompare(b);
     });
+    
+    const diasOrdem = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
     
     let headerHTML = 
         '<div class="view-header">' +
@@ -131,17 +146,28 @@ function renderSalasListForNotas() {
     if (activeSalas.length === 0) {
         bodyHTML = '<div class="empty-state"><p>Nenhuma sala de aula ativa encontrada.</p><p>Cadastre salas em "Gerenciamento de Alunos" primeiro.</p></div>';
     } else {
-        const cardsHTML = activeSalas.map(sala => {
-            let card = '<div class="sala-card" data-sala-id="' + sala.id + '" style="cursor: pointer;">';
-            card += '<div class="sala-card-header">';
-            card += '<h3 class="sala-card-title">' + sala.nome + '</h3>';
-            card += '</div>';
-            card += '<div class="sala-card-days">' + sala.diasSemana.join(', ') + '</div>';
-            card += '<div class="sala-card-days" style="margin-top: 0.5rem;">' + sala.alunos.length + ' aluno(s)</div>';
-            card += '</div>';
-            return card;
+        bodyHTML = sortedSchools.map(schoolName => {
+            const salas = salasBySchool[schoolName].sort((a,b) => {
+                const diaA = Math.min(...a.diasSemana.map(d => diasOrdem.indexOf(d)));
+                const diaB = Math.min(...b.diasSemana.map(d => diasOrdem.indexOf(d)));
+                if (diaA !== diaB) return diaA - diaB;
+                return a.nome.localeCompare(b.nome);
+            });
+
+            const schoolHeader = `<h2 class="view-title" style="font-size: 1.5rem; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">${schoolName}</h2>`;
+
+            const cardsHTML = salas.map(sala => {
+                let card = '<div class="sala-card" data-sala-id="' + sala.id + '" style="cursor: pointer;">';
+                card += '<div class="sala-card-header">';
+                card += '<h3 class="sala-card-title">' + sala.nome + '</h3>';
+                card += '</div>';
+                card += '<div class="sala-card-days">' + sala.diasSemana.join(', ') + '</div>';
+                card += '<div class="sala-card-days" style="margin-top: 0.5rem;">' + sala.alunos.length + ' aluno(s)</div>';
+                card += '</div>';
+                return card;
+            }).join('');
+            return schoolHeader + '<div class="page-grid">' + cardsHTML + '</div>';
         }).join('');
-        bodyHTML = '<div class="page-grid">' + cardsHTML + '</div>';
     }
     notasContentContainer.innerHTML = headerHTML + bodyHTML;
 

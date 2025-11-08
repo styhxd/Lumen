@@ -80,13 +80,29 @@ export function renderAlunosView() {
  */
 function renderSalasList(container: HTMLElement) {
     const activeSalas = state.salas.filter(s => s.status === 'ativa');
-    const diasOrdem = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-    activeSalas.sort((a,b) => {
-        const diaA = Math.min(...a.diasSemana.map(d => diasOrdem.indexOf(d)));
-        const diaB = Math.min(...b.diasSemana.map(d => diasOrdem.indexOf(d)));
-        if (diaA !== diaB) return diaA - diaB;
-        return a.nome.localeCompare(b.nome);
+
+    const salasBySchool: { [school: string]: Sala[] } = activeSalas.reduce((acc, sala) => {
+        let schoolName: string;
+        if (sala.tipo === 'Horista') {
+            schoolName = sala.escolaHorista?.trim() || 'Outras Escolas';
+        } else { // 'Regular'
+            schoolName = state.settings.schoolName;
+        }
+        
+        if (!acc[schoolName]) {
+            acc[schoolName] = [];
+        }
+        acc[schoolName].push(sala);
+        return acc;
+    }, {} as { [school: string]: Sala[] });
+
+    const sortedSchools = Object.keys(salasBySchool).sort((a, b) => {
+        if (a === state.settings.schoolName) return -1;
+        if (b === state.settings.schoolName) return 1;
+        return a.localeCompare(b);
     });
+
+    const diasOrdem = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
     
     let headerHTML = 
         '<div class="view-header">' +
@@ -111,20 +127,31 @@ function renderSalasList(container: HTMLElement) {
     if (activeSalas.length === 0) {
         bodyHTML = '<div class="empty-state"><p>Nenhuma sala de aula ativa encontrada.</p><p>Clique em "Adicionar Sala" para cadastrar a primeira.</p></div>';
     } else {
-        const cardsHTML = activeSalas.map(sala => `
-            <div class="sala-card" data-sala-id="${sala.id}">
-                <div class="sala-card-header">
-                    <h3 class="sala-card-title">${sala.nome}</h3>
-                    <div class="sala-card-actions">
-                        <button class="btn btn-icon edit-btn" data-type="sala" data-id="${sala.id}" aria-label="Editar Sala" title="Editar Sala"><svg class="btn-icon-svg" fill="currentColor" width="18" height="18" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg></button>
-                        <button class="btn btn-icon finalize-btn" data-type="sala" data-id="${sala.id}" aria-label="Finalizar Sala" title="Finalizar Sala"><svg class="btn-icon-svg" fill="currentColor" width="18" height="18" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.83 1H5.42l.82-1zM5 19V8h14v11H5z"></path></svg></button>
-                        <button class="btn btn-icon delete-btn" data-type="sala" data-id="${sala.id}" aria-label="Excluir Sala" title="Excluir Sala"><svg class="btn-icon-svg" fill="currentColor" width="18" height="18" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg></button>
+        bodyHTML = sortedSchools.map(schoolName => {
+            const salas = salasBySchool[schoolName].sort((a,b) => {
+                const diaA = Math.min(...a.diasSemana.map(d => diasOrdem.indexOf(d)));
+                const diaB = Math.min(...b.diasSemana.map(d => diasOrdem.indexOf(d)));
+                if (diaA !== diaB) return diaA - diaB;
+                return a.nome.localeCompare(b.nome);
+            });
+            
+            const schoolHeader = `<h2 class="view-title" style="font-size: 1.5rem; margin-top: 2rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-color);">${schoolName}</h2>`;
+            
+            const cardsHTML = salas.map(sala => `
+                <div class="sala-card" data-sala-id="${sala.id}">
+                    <div class="sala-card-header">
+                        <h3 class="sala-card-title">${sala.nome}</h3>
+                        <div class="sala-card-actions">
+                            <button class="btn btn-icon edit-btn" data-type="sala" data-id="${sala.id}" aria-label="Editar Sala" title="Editar Sala"><svg class="btn-icon-svg" fill="currentColor" width="18" height="18" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg></button>
+                            <button class="btn btn-icon finalize-btn" data-type="sala" data-id="${sala.id}" aria-label="Finalizar Sala" title="Finalizar Sala"><svg class="btn-icon-svg" fill="currentColor" width="18" height="18" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.83 1H5.42l.82-1zM5 19V8h14v11H5z"></path></svg></button>
+                            <button class="btn btn-icon delete-btn" data-type="sala" data-id="${sala.id}" aria-label="Excluir Sala" title="Excluir Sala"><svg class="btn-icon-svg" fill="currentColor" width="18" height="18" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg></button>
+                        </div>
                     </div>
+                    <div class="sala-card-days">${sala.diasSemana.join(', ')}</div>
                 </div>
-                <div class="sala-card-days">${sala.diasSemana.join(', ')}</div>
-            </div>
-        `).join('');
-        bodyHTML = '<div class="page-grid">' + cardsHTML + '</div>';
+            `).join('');
+            return schoolHeader + '<div class="page-grid">' + cardsHTML + '</div>';
+        }).join('');
     }
 
     container.innerHTML = headerHTML + bodyHTML;
