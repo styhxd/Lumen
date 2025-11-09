@@ -781,6 +781,22 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); f
     opacity: 0.8;
 }
 
+.horista-aula-card {
+    background-color: rgba(139, 92, 246, 0.05);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-left-width: 4px;
+    border-radius: 0.75rem;
+    padding: 1rem; 
+    display: grid; 
+    grid-template-columns: 1fr 1.5fr 1fr;
+    grid-template-rows: auto auto; 
+    gap: 0.75rem 1.5rem;
+    grid-template-areas: "info plan anota" "actions plan anota";
+}
+.horista-aula-card .aula-card-title {
+    color: #a78bfa;
+}
+
 .sem-aula-card {
     background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255, 255, 255, 0.02) 10px, rgba(255, 255, 255, 0.02) 20px);
     border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 1rem;
@@ -1724,7 +1740,7 @@ html[data-theme='light'] .event-tag {
     .card-item .card-value { text-align: right; }
 
     /* Reorganiza o grid do card de aula do dia. */
-    .aula-item-card {
+    .aula-item-card, .horista-aula-card {
         grid-template-columns: 1fr 1fr;
          grid-template-areas:
             "info anota"
@@ -1886,7 +1902,7 @@ html[data-theme='light'] .event-tag {
         align-items: flex-start;
         gap: 0.5rem;
     }
-    .aula-item-card {
+    .aula-item-card, .horista-aula-card {
         display: grid;
         grid-template-columns: 1fr;
         grid-template-areas:
