@@ -32,6 +32,7 @@ import * as dom from '../dom.ts';
 import * as utils from '../utils.ts';
 import { switchView } from '../ui.ts';
 import type { Aluno, Livro, Sala, Progresso } from '../types.ts';
+import { generateBoletimHeaderHTML } from '../features/boletimLayout.ts';
 
 // Referência ao contêiner principal desta view para otimizar o acesso ao DOM.
 const notasContentContainer = dom.viewContent.notas;
@@ -602,7 +603,11 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
 
     let finalHTML = '<div class="boletim-a4-wrapper" data-aluno-id="' + aluno.id + '" data-sala-id="' + sala.id + '">';
     finalHTML += '<div class="boletim-container">';
-    finalHTML += '<header class="boletim-header"><div class="school-name">' + schoolNameToDisplay + '</div><div class="teacher-name">Professor: ' + state.settings.teacherName + '</div><div class="course-name">Curso: Inglês</div></header>';
+    
+    // SUBSTITUIÇÃO DO CABEÇALHO ANTIGO PELO NOVO GERADOR SEGURO
+    const headerSettings = { ...state.settings, schoolName: schoolNameToDisplay };
+    finalHTML += generateBoletimHeaderHTML(headerSettings);
+
     finalHTML += '<section class="boletim-student-info"><span><strong>Aluno:</strong> ' + aluno.nomeCompleto + '</span><span><strong>Turma:</strong> ' + sala.nome + '</span><span><strong>CTR:</strong> ' + aluno.ctr + '</span></section>';
     finalHTML += '<div class="boletim-main-content">';
     finalHTML += '<table class="boletim-table">';

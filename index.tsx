@@ -531,6 +531,8 @@ document.addEventListener('DOMContentLoaded', () => {
         (dom.settingsForm.querySelector('#setting-bonus-value') as HTMLInputElement).value = state.settings.bonusValue.toString();
         (dom.settingsForm.querySelector('#setting-min-alunos') as HTMLInputElement).value = state.settings.minAlunos.toString();
         (dom.settingsForm.querySelector('#setting-valor-hora-aula') as HTMLInputElement).value = state.settings.valorHoraAula.toString();
+        // Novo campo para logo
+        (dom.settingsForm.querySelector('#setting-school-logo') as HTMLInputElement).value = state.settings.schoolLogoUrl || '';
         dom.settingsModal.classList.add('visible');
     };
 
@@ -551,6 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.settings.bonusValue = parseFloat((dom.settingsForm.querySelector('#setting-bonus-value') as HTMLInputElement).value);
         state.settings.minAlunos = parseInt((dom.settingsForm.querySelector('#setting-min-alunos') as HTMLInputElement).value, 10);
         state.settings.valorHoraAula = parseFloat((dom.settingsForm.querySelector('#setting-valor-hora-aula') as HTMLInputElement).value);
+        state.settings.schoolLogoUrl = (dom.settingsForm.querySelector('#setting-school-logo') as HTMLInputElement).value.trim();
         
         // Atualiza a UI imediatamente com os novos nomes.
         dom.schoolNameEl.textContent = state.settings.schoolName;
@@ -570,10 +573,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderFrequenciaView();
             }
             if (dom.viewContent.notas.classList.contains('visible')) {
-                const activeBoletim = dom.viewContent.notas.querySelector('.boletim-a4-wrapper');
-                if (activeBoletim && state.notasViewState.alunoId && state.notasViewState.salaId) {
-                    renderNotasView(); 
-                }
+                // Força a re-renderização completa da view de notas para aplicar o logo
+                renderNotasView(); 
             }
         }, 300);
     });

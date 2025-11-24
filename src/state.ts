@@ -62,6 +62,7 @@ export let settings: Settings = {
     minAlunos: 100,
     showFrequenciaValues: false,
     valorHoraAula: 25.00,
+    schoolLogoUrl: '' // Inicializa sem logo
 };
 
 // =================================================================================

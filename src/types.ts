@@ -183,6 +183,7 @@ export interface Settings {
     minAlunos: number; // Meta de alunos para atingir o bônus.
     showFrequenciaValues: boolean; // Flag para mostrar ou ocultar valores monetários na tela de frequência.
     valorHoraAula: number; // Valor da hora/aula para turmas horistas.
+    schoolLogoUrl?: string; // URL da imagem do logo da escola (opcional)
 }
 
 /**
