@@ -555,8 +555,8 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
     const formatValueForInput = (val: number | null | undefined) => val !== null && val !== undefined ? String(val).replace('.', ',') : '';
 
     const tableRowsHTML = finalGradesData.map(grade => {
-        const canEdit = isEditableContext && 
-                        ((sala.tipo === 'Horista' && sala.inicioLivroHorista === 'meio') || grade.bookId === currentActiveBookId);
+        // Permitir edição de qualquer livro se o aluno estiver ativo, conforme solicitado pelo usuário.
+        const canEdit = isEditableContext;
 
         const writtenCellContent = canEdit 
             ? '<input type="text" inputmode="decimal" value="' + formatValueForInput(grade.written) + '" />' 
