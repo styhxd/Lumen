@@ -384,22 +384,7 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
     const activeStudentStatuses = ["Ativo", "Nivelamento", "Transferido (interno)"];
     const isEditableContext = activeStudentStatuses.includes(aluno.statusMatricula) && sala.status === 'ativa';
     
-    let currentActiveBookId: number | null = null;
-    if (isEditableContext) {
-        const studentBooksInCurrentSala = sala.livros
-            .filter(livro => aluno.progresso.some(p => p.livroId === livro.id));
-    
-        if (studentBooksInCurrentSala.length > 0) {
-            currentActiveBookId = studentBooksInCurrentSala
-                .sort((a, b) => getBookNumber(b.nome) - getBookNumber(a.nome))[0].id;
-        } else {
-            if (sala.livros.length > 0) {
-                currentActiveBookId = sala.livros
-                    .sort((a, b) => getBookNumber(b.nome) - getBookNumber(a.nome))[0].id;
-            }
-        }
-    }
-
+    // Lógica para coletar livros relevantes
     const relevantBooksMap = new Map<number, Livro>();
     sala.livros.forEach(livro => relevantBooksMap.set(livro.id, livro));
     aluno.progresso.forEach(prog => {
@@ -409,10 +394,70 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
         }
     });
     
+    // 1. Coleta e ordena todos os livros possíveis
     const allRelevantBooks = Array.from(relevantBooksMap.values()).sort((a, b) => getBookNumber(a.nome) - getBookNumber(b.nome));
 
-    const finalGradesData = allRelevantBooks.map(livro => {
-        const progresso = aluno.progresso.find(p => p.livroId === livro.id);
+    // 2. Agrupa visualmente por nome normalizado para evitar duplicatas na tela
+    const uniqueBooksByName = new Map<string, Livro>();
+    
+    allRelevantBooks.forEach(book => {
+        const norm = utils.normalizeString(book.nome);
+        if (!uniqueBooksByName.has(norm)) {
+            uniqueBooksByName.set(norm, book);
+        } else {
+            // Se já existe, preferimos manter o que está na sala atual, se ambos estiverem ou nenhum estiver
+            const existing = uniqueBooksByName.get(norm)!;
+            const existingInSala = sala.livros.some(l => l.id === existing.id);
+            const currentInSala = sala.livros.some(l => l.id === book.id);
+            
+            // Se o atual está na sala e o existente não, substituímos pelo atual
+            if (!existingInSala && currentInSala) {
+                uniqueBooksByName.set(norm, book);
+            }
+        }
+    });
+    
+    // Reordena os livros únicos
+    const distinctBooks = Array.from(uniqueBooksByName.values()).sort((a, b) => getBookNumber(a.nome) - getBookNumber(b.nome));
+
+    // 3. Gera os dados para cada livro único, buscando o progresso mais relevante
+    const finalGradesData = distinctBooks.map(livro => {
+        // Busca o progresso correspondente ao livro atual (por ID) OU por nome normalizado
+        const currentNormName = utils.normalizeString(livro.nome);
+        
+        // Encontra TODOS os progressos que correspondem a esse nome de livro (normalizado)
+        const matchingProgresses = aluno.progresso.filter(p => {
+             if (p.livroId === livro.id) return true;
+             const pBookInfo = allBooksMap.get(p.livroId);
+             return pBookInfo && utils.normalizeString(pBookInfo.livro.nome) === currentNormName;
+        });
+
+        // Se houver múltiplos progressos para o mesmo "nome" de livro, funde os dados visualmente
+        // preferindo valores não nulos e IDs da sala atual.
+        let progresso: Progresso | undefined = undefined;
+        
+        if (matchingProgresses.length > 0) {
+             // Prioriza o progresso que bate com o ID exato do livro atual
+             let target = matchingProgresses.find(p => p.livroId === livro.id);
+             if (!target) target = matchingProgresses[0]; // Fallback
+             
+             progresso = { ...target }; // Clona para não mutar o original durante a fusão visual
+             
+             // Funde dados dos outros registros duplicados (se houver)
+             matchingProgresses.forEach(p => {
+                 if (p === target) return;
+                 if (progresso!.notaWritten === null) progresso!.notaWritten = p.notaWritten;
+                 if (progresso!.notaOral === null) progresso!.notaOral = p.notaOral;
+                 if (progresso!.notaParticipation === null) progresso!.notaParticipation = p.notaParticipation;
+                 
+                 // Preserva o maior histórico
+                 progresso!.historicoAulasDadas = Math.max(progresso!.historicoAulasDadas || 0, p.historicoAulasDadas || 0) || undefined;
+                 progresso!.historicoPresencas = Math.max(progresso!.historicoPresencas || 0, p.historicoPresencas || 0) || undefined;
+                 progresso!.manualAulasDadas = Math.max(progresso!.manualAulasDadas || 0, p.manualAulasDadas || 0) || undefined;
+                 progresso!.manualPresencas = Math.max(progresso!.manualPresencas || 0, p.manualPresencas || 0) || undefined;
+             });
+        }
+
         const bookOwnerSala = allBooksMap.get(livro.id)?.sala || sala;
 
         let aulasDadasFinal: number;

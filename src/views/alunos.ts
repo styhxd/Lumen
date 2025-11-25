@@ -25,6 +25,7 @@ import { switchView } from '../ui.ts';
 import type { Aluno, Livro, Sala, Progresso } from '../types.ts';
 import { setNotasViewState } from './notas.ts';
 import { handleDeleteClick } from '../modals.ts';
+import { deduplicateAndSanitizeProgress } from '../data.ts';
 
 // =================================================================================
 // CONSTANTES E VARIÁVEIS DO MÓDULO
@@ -806,7 +807,8 @@ function updateTransferOptionsUI() {
     const sourceLivro = sourceSala?.livros.find(l => l.id === sourceLivroId);
     const destLivro = destSala?.livros.find(l => l.id === destLivroId);
 
-    if (sourceLivro && destLivro && sourceLivro.nome === destLivro.nome) {
+    // Verifica se os livros têm o mesmo nome (usando a normalização agressiva)
+    if (sourceLivro && destLivro && utils.normalizeString(sourceLivro.nome) === utils.normalizeString(destLivro.nome)) {
         transferGradesGroup.style.display = 'block';
     }
 }
@@ -1168,44 +1170,75 @@ export function initAlunos() {
             return;
         }
         
+        // Move student from Source to Destination
         const [aluno] = sourceSala.alunos.splice(alunoIndex, 1);
+        const isSameLevelTransfer = utils.normalizeString(sourceLivro.nome) === utils.normalizeString(destLivro.nome);
+
+        // --- LÓGICA DE CORREÇÃO DE DUPLICIDADE NA TRANSFERÊNCIA ---
         
-        const isSameLevelTransfer = sourceLivro.nome === destLivro.nome;
-        
-        if (isSameLevelTransfer && transferGrades) {
-            const sourceProgressoIndex = aluno.progresso.findIndex(p => p.livroId === sourceLivro.id);
-            if (sourceProgressoIndex > -1) {
-                const [sourceProgresso] = aluno.progresso.splice(sourceProgressoIndex, 1);
-                aluno.progresso = aluno.progresso.filter(p => p.livroId !== destLivro.id);
-                sourceProgresso.livroId = destLivro.id;
-                sourceProgresso.historicoAulasDadas = historicoAulasDadas;
-                sourceProgresso.historicoPresencas = historicoPresencas;
-                delete sourceProgresso.manualAulasDadas;
-                delete sourceProgresso.manualPresencas;
-                aluno.progresso.push(sourceProgresso);
+        // Helper para encontrar o nome do livro pelo ID
+        const getBookName = (id: number) => {
+            for (const s of state.salas) {
+                const l = s.livros.find(book => book.id === id);
+                if (l) return l.nome;
+            }
+            return '';
+        };
+
+        // Procura se o aluno já tem progresso para o livro de destino (seja pelo ID ou pelo NOME NORMALIZADO)
+        const existingEntryIndex = aluno.progresso.findIndex(p => {
+            if (p.livroId === destLivro.id) return true; // Mesmo ID exato
+            return utils.normalizeString(getBookName(p.livroId)) === utils.normalizeString(destLivro.nome); // Mesmo nome normalizado
+        });
+
+        if (existingEntryIndex > -1) {
+            // Encontrou um conflito (ex: aluno já tem Book 1). Vamos resolver.
+            const existing = aluno.progresso[existingEntryIndex];
+            
+            // Remove o registro conflitante da lista para reprocessá-lo
+            aluno.progresso.splice(existingEntryIndex, 1);
+
+            if (isSameLevelTransfer && transferGrades) {
+                // Se for para manter notas, atualizamos o ID do registro antigo para o novo ID da sala de destino
+                // e atualizamos o histórico de presença.
+                existing.livroId = destLivro.id;
+                existing.historicoAulasDadas = Math.max(existing.historicoAulasDadas || 0, historicoAulasDadas);
+                existing.historicoPresencas = Math.max(existing.historicoPresencas || 0, historicoPresencas);
+                
+                // Readiciona o progresso atualizado/migrado
+                aluno.progresso.push(existing);
             } else {
-                const newProgresso: Progresso = { livroId: destLivroId, notaWritten: null, notaOral: null, notaParticipation: null, historicoAulasDadas: historicoAulasDadas, historicoPresencas: historicoPresencas };
-                aluno.progresso = aluno.progresso.filter(p => p.livroId !== destLivro.id);
+                // Se NÃO for para manter notas, criamos um novo registro limpo para o destino.
+                // O registro antigo foi removido acima, evitando a duplicidade no boletim.
+                const newProgresso: Progresso = { 
+                    livroId: destLivroId, 
+                    notaWritten: null, 
+                    notaOral: null, 
+                    notaParticipation: null,
+                    historicoAulasDadas: historicoAulasDadas,
+                    historicoPresencas: historicoPresencas
+                };
                 aluno.progresso.push(newProgresso);
             }
-        } else { // Transferência para livro diferente OU mesma transferência de livro SEM manter notas
-            let progresso = aluno.progresso.find(p => p.livroId === destLivroId);
-            if (!progresso) {
-                progresso = { livroId: destLivroId, notaWritten: null, notaOral: null, notaParticipation: null };
-                aluno.progresso.push(progresso);
-            }
-            progresso.historicoAulasDadas = historicoAulasDadas;
-            progresso.historicoPresencas = historicoPresencas;
-            progresso.notaWritten = null;
-            progresso.notaOral = null;
-            progresso.notaParticipation = null;
-            delete progresso.manualAulasDadas;
-            delete progresso.manualPresencas;
+        } else {
+            // Se não houver conflito, adiciona o novo progresso normalmente
+            const newProgresso: Progresso = { 
+                livroId: destLivroId, 
+                notaWritten: null, 
+                notaOral: null, 
+                notaParticipation: null,
+                historicoAulasDadas: historicoAulasDadas,
+                historicoPresencas: historicoPresencas
+            };
+            aluno.progresso.push(newProgresso);
         }
 
         destSala.alunos.push(aluno);
         aluno.statusMatricula = 'Transferido (interno)';
         aluno.origemTransferencia = sourceSala.nome;
+
+        // FAILSAFE EXTRA: Roda a sanitização global para garantir integridade
+        deduplicateAndSanitizeProgress();
 
         state.setDataDirty(true);
         utils.showToast(`Aluno ${aluno.nomeCompleto} transferido para ${destSala.nome}.`, 'success');

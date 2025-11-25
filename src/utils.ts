@@ -75,3 +75,14 @@ export const setButtonLoading = (button: HTMLButtonElement | null, isLoading: bo
     button.classList.toggle('loading', isLoading);
     button.disabled = isLoading;
 };
+
+/**
+ * Normaliza uma string removendo acentos, pontuação e espaços extras.
+ * Essencial para comparar nomes de livros e evitar duplicatas como "Book 1" vs "Book 1 ".
+ * @param str A string a ser normalizada.
+ * @returns A string normalizada.
+ */
+export function normalizeString(str: string): string {
+    if (!str) return '';
+    return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s]|_/g, "").replace(/\s+/g, " ").trim();
+}

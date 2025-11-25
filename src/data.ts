@@ -180,14 +180,85 @@ function renderAllViews() {
 }
 
 /**
- * Higieniza os dados de progresso dos alunos para corrigir inconsistências cronológicas.
- * Esta função atua como um "failsafe" não-destrutivo. Em vez de apagar dados, ela
- * identifica casos onde um livro mais avançado (ex: Book 3) tem uma data de início
- * anterior a um livro mais básico (ex: Book 2) e **corrige** a data inválida,
- * preservando todas as notas e registros de frequência associados.
+ * Função FAILSAFE para deduplicação e sanitização de progresso.
+ * Corrige problemas onde um aluno tem múltiplos registros para o mesmo livro (por nome),
+ * fundindo os dados para preservar notas e frequência.
  */
-function sanitizeStudentProgress() {
-    let dataWasSanitized = false;
+export function deduplicateAndSanitizeProgress() {
+    // 1. Mapa Global de Livros: ID -> {Nome, SalaId}
+    const bookInfoMap = new Map<number, { nome: string, salaId: number }>();
+    state.salas.forEach(s => s.livros.forEach(l => bookInfoMap.set(l.id, { nome: l.nome, salaId: s.id })));
+
+    let totalFixed = 0;
+
+    state.salas.forEach(sala => {
+        sala.alunos.forEach(aluno => {
+            // Agrupa o progresso pelo NOME NORMALIZADO do livro
+            const byName = new Map<string, Progresso[]>();
+            
+            aluno.progresso.forEach(p => {
+                const info = bookInfoMap.get(p.livroId);
+                // Usa normalização agressiva para agrupar "Book 1" e "Book 1 " e "Book 1: Title" corretamente
+                const name = info ? utils.normalizeString(info.nome) : `orphaned_book_${p.livroId}`;
+                if (!byName.has(name)) byName.set(name, []);
+                byName.get(name)!.push(p);
+            });
+
+            const sanitizedProgress: Progresso[] = [];
+
+            byName.forEach((entries, bookName) => {
+                if (entries.length === 1) {
+                    sanitizedProgress.push(entries[0]);
+                } else {
+                    // DUPLICATA ENCONTRADA: Realiza o MERGE
+                    totalFixed++;
+                    
+                    // 1. Escolhe o ID alvo. Prioridade: ID que pertence à sala atual do aluno.
+                    const currentSalaBookIds = sala.livros.map(l => l.id);
+                    let targetEntry = entries.find(e => currentSalaBookIds.includes(e.livroId));
+                    
+                    // Se nenhum pertencer à sala atual, pega o último (assumindo ser o mais recente/relevante)
+                    if (!targetEntry) targetEntry = entries[entries.length - 1];
+
+                    // Cria um novo objeto fundido baseado no alvo
+                    const merged: Progresso = { ...targetEntry };
+
+                    // 2. Funde os dados de todas as entradas duplicadas
+                    entries.forEach(e => {
+                        if (e === targetEntry) return; // Pula o próprio alvo (já copiado)
+
+                        // Preserva notas existentes (se merged for null e e for valor, usa e)
+                        if (merged.notaWritten === null && e.notaWritten !== null) merged.notaWritten = e.notaWritten;
+                        if (merged.notaOral === null && e.notaOral !== null) merged.notaOral = e.notaOral;
+                        if (merged.notaParticipation === null && e.notaParticipation !== null) merged.notaParticipation = e.notaParticipation;
+
+                        // Preserva o maior valor de histórico/manual para não perder frequência
+                        merged.manualAulasDadas = Math.max(merged.manualAulasDadas || 0, e.manualAulasDadas || 0) || undefined;
+                        merged.manualPresencas = Math.max(merged.manualPresencas || 0, e.manualPresencas || 0) || undefined;
+                        merged.historicoAulasDadas = Math.max(merged.historicoAulasDadas || 0, e.historicoAulasDadas || 0) || undefined;
+                        merged.historicoPresencas = Math.max(merged.historicoPresencas || 0, e.historicoPresencas || 0) || undefined;
+                    });
+
+                    sanitizedProgress.push(merged);
+                }
+            });
+
+            aluno.progresso = sanitizedProgress;
+        });
+    });
+
+    // Chama a sanitização de datas antiga como complemento
+    sanitizeDates();
+    
+    if (totalFixed > 0) {
+        console.log(`[Lumen Sanitizer] Corrigidos ${totalFixed} casos de livros duplicados.`);
+    }
+}
+
+/**
+ * Higieniza as datas de progresso (função legada, mantida e chamada pela nova sanitização).
+ */
+function sanitizeDates() {
     const getBookNumber = (bookName: string): number => {
         if (!bookName) return 0;
         const match = bookName.match(/\d+/);
@@ -204,8 +275,6 @@ function sanitizeStudentProgress() {
     state.salas.forEach(sala => {
         sala.alunos.forEach(aluno => {
             if (aluno.progresso.length < 2) return;
-
-            // Ordena os progressos por número do livro para facilitar a verificação
             const sortedProgress = [...aluno.progresso].sort((a, b) => {
                 const bookInfoA = allBooksMap.get(a.livroId);
                 const bookInfoB = allBooksMap.get(b.livroId);
@@ -213,42 +282,26 @@ function sanitizeStudentProgress() {
                 return getBookNumber(bookInfoA.livro.nome) - getBookNumber(bookInfoB.livro.nome);
             });
 
-            // Itera e compara cada livro com o próximo na sequência cronológica
             for (let i = 0; i < sortedProgress.length - 1; i++) {
                 const currentProgress = sortedProgress[i];
                 const nextProgress = sortedProgress[i + 1];
-
                 const currentBookInfo = allBooksMap.get(currentProgress.livroId);
                 const nextBookInfo = allBooksMap.get(nextProgress.livroId);
 
                 if (!currentBookInfo || !nextBookInfo) continue;
-
                 const { livro: currentLivro } = currentBookInfo;
                 const { livro: nextLivro } = nextBookInfo;
                 
-                // Se um livro mais avançado tem data de início anterior ou igual ao livro atual, é uma inconsistência.
                 if (nextLivro.mesInicio <= currentLivro.mesInicio) {
                     const [year, month] = currentLivro.mesInicio.split('-').map(Number);
-                    const correctedDate = new Date(year, month, 1); // JS month is 0-indexed, so month becomes month+1
+                    const correctedDate = new Date(year, month, 1);
                     const newYear = correctedDate.getFullYear();
                     const newMonth = (correctedDate.getMonth() + 1).toString().padStart(2, '0');
-                    
-                    const newMesInicio = `${newYear}-${newMonth}`;
-
-                    // **A CORREÇÃO:** Em vez de apagar, ajusta a data para o mês seguinte ao do livro anterior.
-                    nextLivro.mesInicio = newMesInicio;
-                    
-                    dataWasSanitized = true;
-                    console.warn(`[Lumen Data Sanitizer] Corrigida data de início inconsistente para o aluno ${aluno.nomeCompleto} no livro "${nextLivro.nome}". A data foi ajustada para ${newMesInicio} para manter a ordem cronológica.`);
+                    nextLivro.mesInicio = `${newYear}-${newMonth}`;
                 }
             }
         });
     });
-
-    if (dataWasSanitized) {
-        state.setDataDirty(true);
-        utils.showToast('Datas de progresso inconsistentes foram corrigidas automaticamente.', 'success');
-    }
 }
 
 
@@ -281,8 +334,8 @@ export function loadAllData() {
     // Popula o calendário com os feriados iniciais.
     state.calendarioEventos.splice(0, state.calendarioEventos.length, ...getInitialHolidays());
     
-    // **NOVO**: Executa a rotina de higienização dos dados.
-    sanitizeStudentProgress();
+    // Executa a rotina de higienização dos dados.
+    deduplicateAndSanitizeProgress();
 
     // Reseta a flag que indica se há alterações não salvas.
     state.setDataDirty(false);
@@ -311,7 +364,7 @@ function handleExport() {
     // Estrutura o objeto de exportação com metadados para validação na importação.
     const exportData = { 
         appName: 'Lumen', 
-        version: '2.1.1', // Updated version
+        version: '2.1.3', // Version Bump
         exportDate: new Date().toISOString(), 
         data: { 
             settings: state.settings,
@@ -428,30 +481,42 @@ function confirmImport() {
         const eventosParaImportar = dataToImport.calendarioEventos || getInitialHolidays();
         state.calendarioEventos.splice(0, state.calendarioEventos.length, ...eventosParaImportar);
 
-        // 3. FAZ A FUSÃO (MERGE) DO PROGRESSO
+        // 3. FAZ A FUSÃO (MERGE) DO PROGRESSO - PRESERVA DADOS
+        // Essa etapa combina IDs antigos com novos, mas AINDA pode gerar duplicatas
+        // se os IDs forem diferentes para o mesmo livro. A sanitização corrige isso depois.
         state.salas.forEach(sala => {
             sala.alunos.forEach(aluno => {
                 const oldProgress = existingProgressMap.get(aluno.id);
                 if (oldProgress) {
-                    // Usa um Map para garantir que o progresso de cada livro seja único.
-                    // A ordem é importante: o progresso do arquivo importado (novo)
-                    // sobrescreve o antigo para o mesmo livro, mas o progresso de
-                    // livros que só existiam no estado antigo é preservado.
+                    // Usa um Map para garantir que o progresso de cada ID seja único.
                     const mergedProgressMap = new Map<number, Progresso>();
                     
                     // Adiciona o progresso antigo primeiro
                     oldProgress.forEach(p => mergedProgressMap.set(p.livroId, p));
                     
                     // Adiciona/sobrescreve com o progresso do arquivo importado
-                    aluno.progresso.forEach(p => mergedProgressMap.set(p.livroId, p));
+                    aluno.progresso.forEach(p => {
+                        // Se já existe dados para este ID, tenta manter o melhor (não sobrescreve com nulos)
+                        if(mergedProgressMap.has(p.livroId)) {
+                            const existing = mergedProgressMap.get(p.livroId)!;
+                            existing.notaWritten = p.notaWritten ?? existing.notaWritten;
+                            existing.notaOral = p.notaOral ?? existing.notaOral;
+                            existing.notaParticipation = p.notaParticipation ?? existing.notaParticipation;
+                            existing.historicoPresencas = Math.max(existing.historicoPresencas || 0, p.historicoPresencas || 0) || undefined;
+                            existing.historicoAulasDadas = Math.max(existing.historicoAulasDadas || 0, p.historicoAulasDadas || 0) || undefined;
+                            // (Mantém o objeto fundido no map)
+                        } else {
+                            mergedProgressMap.set(p.livroId, p);
+                        }
+                    });
 
                     aluno.progresso = Array.from(mergedProgressMap.values());
                 }
             });
         });
 
-        // 4. HIGIENIZAÇÃO E RENDERIZAÇÃO FINAL
-        sanitizeStudentProgress();
+        // 4. HIGIENIZAÇÃO E DEDUPLICAÇÃO POR NOME (A CORREÇÃO DEFINITIVA)
+        deduplicateAndSanitizeProgress();
         
         state.setDataDirty(false);
         
@@ -460,7 +525,7 @@ function confirmImport() {
         switchView('dashboard');
         
         utils.setButtonLoading(dom.confirmImportBtn, false);
-        utils.showToast('Dados importados com fusão inteligente!', 'success');
+        utils.showToast('Dados importados e otimizados!', 'success');
         closeImportModal();
     }, 500);
 }
