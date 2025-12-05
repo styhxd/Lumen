@@ -245,6 +245,10 @@
                 <div class="view-header">
                     <h1 id="aula-dia-view-title" class="view-title">Aula do Dia</h1>
                     <div class="btn-row">
+                        <button id="add-ferias-btn" class="btn btn-large" style="background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); color: #333; border: none;">
+                            <svg class="btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                            <span class="btn-text">Registrar Férias</span>
+                        </button>
                         <button id="add-aula-btn" class="btn btn-large btn-primary">
                             <svg class="btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                             <span class="btn-text">Planejar Aula</span>
@@ -472,6 +476,29 @@
                     <button type="submit" id="prova-save-btn" class="btn btn-primary">
                         <span class="btn-text">Salvar</span>
                         <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="ferias-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h2 class="view-title">Registrar Férias! 🎉</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Selecione o período para registrar férias no sistema.</p>
+            <form id="ferias-form">
+                <div class="form-group">
+                    <label for="ferias-start-date">Início das Férias</label>
+                    <input type="date" id="ferias-start-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="ferias-end-date">Fim das Férias</label>
+                    <input type="date" id="ferias-end-date" required>
+                </div>
+                <div class="modal-actions" style="justify-content: center;">
+                    <button type="button" id="ferias-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="ferias-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Confirmar</span>
                     </button>
                 </div>
             </form>

@@ -71,6 +71,27 @@ function getFreelanceAulaCardHTML(aula: Aula): string {
     </div>`;
 }
 
+/**
+ * Gera o HTML para o card de Férias.
+ * @param aula O objeto da aula a ser renderizado.
+ * @returns Uma string HTML com o card de férias estilizado.
+ */
+function getFeriasCardHTML(aula: Aula): string {
+    return `
+    <div class="ferias-card" data-id="${aula.id}" data-type="aula">
+        <div class="ferias-info">
+            <div class="ferias-icon">🏖️</div>
+            <div class="ferias-text-content">
+                <h3>Férias! 🎉</h3>
+                <p>Aproveite o descanso!</p>
+            </div>
+        </div>
+        <div class="aviso-actions">
+            <button class="btn btn-icon delete-btn" aria-label="Excluir" title="Excluir"><svg class="btn-icon-svg" fill="currentColor" width="20" height="20" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg></button>
+        </div>
+    </div>`;
+}
+
 
 /**
  * Renderiza a visualização principal da "Aula do Dia", exibindo um calendário
@@ -129,6 +150,10 @@ export function renderAulaDoDia() {
         if (aulasDoDia.length > 0) {
             // Se houver aulas, mapeia cada uma para seu respectivo HTML de "card".
             aulasHTML = aulasDoDia.map(aula => {
+                if (aula.eventType === 'Férias') {
+                    return getFeriasCardHTML(aula);
+                }
+                
                 if (aula.isFreelanceHorista) {
                     return getFreelanceAulaCardHTML(aula);
                 }
@@ -241,6 +266,10 @@ export function renderAulasArquivadas(selectedMonth: string | null = null) {
         let aulasHTML = '';
         if (aulasDoDia.length > 0) {
             aulasHTML = aulasDoDia.map(aula => {
+                if (aula.eventType === 'Férias') {
+                    return getFeriasCardHTML(aula);
+                }
+
                 if (aula.isFreelanceHorista) {
                     return getFreelanceAulaCardHTML(aula);
                 }
@@ -361,6 +390,18 @@ export function openFreelanceAulaModal(aula: Aula | null = null, date: string | 
     (document.getElementById('freelance-aula-anotacoes') as HTMLTextAreaElement).value = aula?.anotacoes || '';
 
     dom.freelanceAulaModal.classList.add('visible');
+}
+
+/**
+ * Abre o modal para registrar férias.
+ */
+function openFeriasModal() {
+    dom.feriasForm.reset();
+    dom.feriasModal.classList.add('visible');
+}
+
+function closeFeriasModal() {
+    dom.feriasModal.classList.remove('visible');
 }
 
 /**
@@ -673,5 +714,74 @@ export function initAulaDoDia() {
             utils.setButtonLoading(saveBtn, false);
             utils.showToast('Aula horista salva com sucesso!', 'success');
         }, 300);
+    });
+
+    // --- NOVA LÓGICA DE FÉRIAS (BATCH CREATE) ---
+    document.getElementById('add-ferias-btn')?.addEventListener('click', () => openFeriasModal());
+    document.getElementById('ferias-cancel-btn')?.addEventListener('click', closeFeriasModal);
+    dom.feriasModal.addEventListener('click', (e) => { if (e.target === dom.feriasModal) closeFeriasModal(); });
+
+    dom.feriasForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        try {
+            const startDateStr = (document.getElementById('ferias-start-date') as HTMLInputElement).value;
+            const endDateStr = (document.getElementById('ferias-end-date') as HTMLInputElement).value;
+
+            if (!startDateStr || !endDateStr) {
+                utils.showToast('Selecione ambas as datas.', 'error');
+                return;
+            }
+
+            // Garante o cálculo correto de datas independente do fuso horário
+            const startDate = new Date(startDateStr + 'T12:00:00');
+            const endDate = new Date(endDateStr + 'T12:00:00');
+
+            if (startDate > endDate) {
+                utils.showToast('A data de início deve ser anterior ou igual à data de fim.', 'error');
+                return;
+            }
+
+            let currentDate = startDate;
+            let addedCount = 0;
+
+            // Loop simples e seguro para criar os registros
+            while (currentDate <= endDate) {
+                const dateStr = currentDate.toISOString().split('T')[0];
+                
+                // Evita duplicar se já existir "Férias" nesse dia, para manter o failsafe
+                const exists = state.aulas.some(a => a.date === dateStr && a.eventType === 'Férias');
+                
+                if (!exists) {
+                    state.aulas.push({
+                        id: Date.now() + addedCount, // Garante IDs únicos no loop
+                        date: dateStr,
+                        isNoClassEvent: true,
+                        eventType: 'Férias',
+                        tema: 'Férias! 🎉',
+                        turma: '', linguagem: '', livroOndeParou: '', ondeParou: '', 
+                        livroAulaHoje: '', aulaHoje: '', aulaSeguinte: '', anotacoes: '',
+                        chamadaRealizada: false, presentes: []
+                    });
+                    addedCount++;
+                }
+
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            if (addedCount > 0) {
+                state.setDataDirty(true);
+                renderAulaDoDia();
+                utils.showToast(`${addedCount} dias de férias registrados! 🎉`, 'success');
+            } else {
+                utils.showToast('Nenhum dia novo registrado (dias já marcados?).', 'warning');
+            }
+            
+            closeFeriasModal();
+
+        } catch (error) {
+            console.error(error);
+            utils.showToast('Ocorreu um erro ao registrar as férias.', 'error');
+        }
     });
 }

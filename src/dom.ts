@@ -124,6 +124,7 @@ export const bulkRiskSelectionList = document.getElementById('bulk-risk-selectio
 export const bulkRiskSelectAll = document.getElementById('bulk-risk-select-all') as HTMLInputElement;
 export const confirmBulkRiskReportBtn = document.getElementById('confirm-bulk-risk-report-btn') as HTMLButtonElement;
 export const cancelBulkRiskReportBtn = document.getElementById('cancel-bulk-risk-report-btn') as HTMLButtonElement;
+export const feriasModal = document.getElementById('ferias-modal') as HTMLElement;
 
 
 // =================================================================================
@@ -147,6 +148,7 @@ export const aulaParticularLessonForm = document.getElementById('aula-particular
 export const settingsForm = document.getElementById('settings-form') as HTMLFormElement;
 export const calendarioForm = document.getElementById('calendario-form') as HTMLFormElement;
 export const riskReportFeedbackForm = document.getElementById('risk-report-feedback-form') as HTMLFormElement;
+export const feriasForm = document.getElementById('ferias-form') as HTMLFormElement;
 
 
 // =================================================================================
