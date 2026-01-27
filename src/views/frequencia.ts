@@ -63,13 +63,24 @@ function calculateMonthlyFinancials(monthYear: string) {
     const totalEligibleStudents = distinctStudents.size;
     
     let frequentStudentsCount = 0;
-    const bubbleStudents: { name: string, percent: number, sala: string }[] = [];
+    // Estrutura expandida para guardar os detalhes matemáticos
+    const bubbleStudents: { 
+        name: string, 
+        percent: number, 
+        sala: string,
+        missing: number,
+        present: number,
+        total: number 
+    }[] = [];
 
     distinctStudents.forEach(studentId => {
         let isFrequent = false;
         let maxFreq = 0;
         let studentName = '';
         let salaName = '';
+        
+        // Variáveis temporárias para guardar o status do "livro" com melhor desempenho (ou que botou no radar)
+        let currentBestStats = { missing: 0, present: 0, total: 0 };
 
         for (const sala of effectivelyActiveSalas) {
             const alunoRef = sala.alunos.find(a => a.id === studentId);
@@ -91,18 +102,40 @@ function calculateMonthlyFinancials(monthYear: string) {
                 const total = aulasPorLivro[livro].length;
                 if (total > 0) {
                     const presencas = aulasPorLivro[livro].filter(a => a.presentes.includes(studentId)).length;
-                    // CORREÇÃO: Math.round para evitar que 49.9% seja reprovado.
                     const freq = Math.round((presencas / total) * 100);
+                    const required = Math.ceil(total * 0.5); // Regra dos 50% arredondado para cima
                     
-                    if (freq > maxFreq) maxFreq = freq;
-                    if (freq >= 50) isFrequent = true;
+                    if (freq >= 50) {
+                        isFrequent = true;
+                    } 
+                    
+                    // Se não for frequente, mas estiver > maxFreq atual, atualizamos os dados para o Radar
+                    // Isso garante que peguemos o melhor cenário do aluno (ou o cenário de risco)
+                    if (freq > maxFreq) {
+                        maxFreq = freq;
+                        currentBestStats = {
+                            missing: required - presencas,
+                            present: presencas,
+                            total: total
+                        };
+                    }
                 }
             }
         }
 
-        if (isFrequent) frequentStudentsCount++;
+        if (isFrequent) {
+            frequentStudentsCount++;
+        }
         else if (maxFreq >= 40 && maxFreq < 50) {
-            bubbleStudents.push({ name: studentName, percent: maxFreq, sala: salaName });
+            // Só adiciona ao radar se NÃO atingiu a meta em nenhum livro, mas ficou perto em algum
+            bubbleStudents.push({ 
+                name: studentName, 
+                percent: maxFreq, 
+                sala: salaName,
+                missing: currentBestStats.missing,
+                present: currentBestStats.present,
+                total: currentBestStats.total
+            });
         }
     });
 
@@ -231,11 +264,13 @@ export function renderFrequenciaView(selectedMonthYear: string | null = null) {
     const trendColor = trend >= 0 ? 'var(--success-color)' : 'var(--error-color)';
     const trendText = trend >= 0 ? `+R$ ${trend.toFixed(2)}` : `-R$ ${Math.abs(trend).toFixed(2)}`;
 
-    // Visibilidade (Blur Style)
-    // O estilo de blur agora é aplicado via CSS inline para garantir que pegue em todos os elementos
-    const blurStyle = !state.settings.showFrequenciaValues ? 'filter: blur(8px); user-select: none;' : '';
+    // Visibilidade (Blur Style Fortalecido)
+    // Aumentado para 20px de blur e reduzida opacidade para garantir total ofuscação
+    const blurStyle = !state.settings.showFrequenciaValues 
+        ? 'filter: blur(20px); opacity: 0.5; transform: scale(0.95); user-select: none; pointer-events: none;' 
+        : 'transition: all 0.5s ease;';
+
     const visibilityClass = state.settings.showFrequenciaValues ? '' : 'hidden';
-    
     frequenciaToggleVisibilityBtn.innerHTML = state.settings.showFrequenciaValues ? utils.eyeOffIcon : utils.eyeIcon;
 
     // Seletor de Mês
@@ -324,7 +359,7 @@ export function renderFrequenciaView(selectedMonthYear: string | null = null) {
                         <svg width="24" height="24" fill="none" stroke="var(--primary-blue)" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
                         Evolução Semestral
                     </div>
-                    <div style="flex-grow: 1; width: 100%; transition: filter 0.3s; ${blurStyle}">
+                    <div style="flex-grow: 1; width: 100%; ${blurStyle}">
                         ${generateEvolutionChart(currentMonthYear)}
                     </div>
                 </div>
@@ -392,7 +427,7 @@ export function renderFrequenciaView(selectedMonthYear: string | null = null) {
                         Radar ("Na Trave")
                     </div>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.4;">
-                        Alunos entre <strong>40-49%</strong>. Faltam poucas aulas para o bônus.
+                        Alunos que precisam de poucas aulas para atingir a meta de <strong>50%</strong>.
                     </p>
                     
                     ${currentStats.bubbleStudents.length === 0 
@@ -403,9 +438,11 @@ export function renderFrequenciaView(selectedMonthYear: string | null = null) {
                                     <div>
                                         <div style="font-weight: 600; color: var(--text-color); font-size: 0.9rem;">${s.name}</div>
                                         <div style="font-size: 0.75rem; color: var(--text-secondary);">${s.sala}</div>
+                                        <div style="font-size: 0.75rem; color: var(--warning-color); margin-top: 2px;">Faltam <strong>${s.missing}</strong> presença(s)</div>
                                     </div>
                                     <div style="text-align: right;">
                                         <div style="font-weight: bold; color: var(--warning-color); font-size: 1.1rem;">${s.percent.toFixed(0)}%</div>
+                                        <div style="font-size: 0.7rem; color: var(--text-secondary);">${s.present}/${s.total} aulas</div>
                                     </div>
                                 </div>
                             `).join('')}
