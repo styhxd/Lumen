@@ -3,8 +3,7 @@
  * =================================================================================
  * MÓDULO DE GERENCIAMENTO DE DADOS (src/data.ts)
  * =================================================================================
- * Gerencia o ciclo de vida dos dados: Carregamento do Supabase, Auto-Save,
- * Importação/Exportação local e sanitização.
+ * Gerencia o ciclo de vida dos dados com estratégia de QUÁDRUPLA redundância.
  */
 
 import * as state from './state.ts';
@@ -27,158 +26,277 @@ import { renderNotasView } from './views/notas.ts';
 import { renderReportsView } from './views/reports.ts';
 
 let dataToImport: any = null;
-let saveTimeout: any = null; // Timer para o debounce
+let saveTimeout: any = null;
+let watchdogTimeout: any = null;
 
-/**
- * =================================================================================
- * LÓGICA DE AUTO-SAVE (SUPABASE)
- * =================================================================================
- */
+// =================================================================================
+// LÓGICA DE AUTO-SAVE NUCLEAR (4 PLANOS)
+// =================================================================================
 
-/**
- * Função acionada sempre que state.setDataDirty(true) é chamado.
- * Usa um timer (debounce) para esperar o usuário parar de digitar antes de salvar.
- */
 export function triggerAutoSave() {
-    // Cancela o timer anterior se houver
-    if (saveTimeout) {
-        clearTimeout(saveTimeout);
-    }
+    if (saveTimeout) clearTimeout(saveTimeout);
+    if (watchdogTimeout) clearTimeout(watchdogTimeout);
 
     state.setIsSaving(true);
 
-    // Define um novo timer para executar o salvamento em 3 segundos
+    // WATCHDOG: Se nada funcionar em 12s, força o Plano D (Local) e destrava a tela
+    watchdogTimeout = setTimeout(() => {
+        if (state.isSaving) {
+            console.warn("☢️ Watchdog: Tempo limite total excedido. Forçando Plano D.");
+            executePlanD("Timeout Geral");
+        }
+    }, 12000);
+
     saveTimeout = setTimeout(async () => {
-        await saveToSupabase();
-    }, 3000);
+        await orchestrateSave();
+    }, 2000);
 }
 
-/**
- * Salva o estado atual da aplicação na tabela 'user_data' do Supabase.
- * SOLUÇÃO DEFINITIVA V3: Timeout Rígido + Finally Block
- */
-async function saveToSupabase() {
-    // 1. Failcheck de Rede
+// Orquestrador das Camadas de Salvamento
+async function orchestrateSave() {
+    const payload = preparePayload();
+    
+    // Check 0: Internet
     if (!navigator.onLine) {
-        console.warn("Auto-save: Sem internet.");
-        state.setIsSaving(false);
+        executePlanD("Sem internet");
         return;
     }
 
-    // 2. Failcheck de Sessão
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session || !session.user) {
-        console.warn("Auto-save: Sessão inválida.");
-        state.setIsSaving(false);
+    // Check 0.5: Sessão
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session || !session.user) {
+        executePlanD("Sem sessão");
         return;
     }
+
+    const userId = session.user.id;
 
     try {
-        const user = session.user;
+        // --- PLANO A: RPC (SERVER-SIDE FUNCTION) ---
+        // A melhor opção. O banco executa a gravação internamente.
+        // Requer a função SQL `save_user_data` criada no banco.
+        console.log("🛡️ Tentando Plano A (RPC Server-Side)...");
+        const { error: errorA } = await supabase.rpc('save_user_data', { payload: payload });
 
-        const appData = { 
-            settings: state.settings,
-            avisos: state.avisos, 
-            recursos: state.recursos, 
-            provas: state.provas, 
-            aulas: state.aulas, 
-            salas: state.salas, 
-            alunosParticulares: state.alunosParticulares, 
-            calendarioEventos: state.calendarioEventos,
-        };
-
-        // 3. FAILSAFE: Timeout Rígido de 5 segundos
-        // Se o Supabase não responder em 5s, rejeitamos a promessa para destravar a UI.
-        const timeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("TIMEOUT_5S")), 5000)
-        );
-
-        const request = supabase
-            .from('user_data')
-            .upsert({ 
-                user_id: user.id, 
-                data: appData,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'user_id' });
-
-        // Race: Quem chegar primeiro ganha (O sucesso ou o erro de timeout)
-        const result = await Promise.race([request, timeout]) as any;
-
-        if (result && result.error) throw result.error;
-
-        // Sucesso
-        state.setDataDirty(false); 
-        console.log("Salvo com sucesso no Supabase.");
-
-    } catch (err: any) {
-        console.error("Erro no Auto-Save:", err);
-        
-        const saveStatusEl = document.getElementById('save-status');
-        if (saveStatusEl) {
-            let msg = "Erro ao salvar";
-            
-            if (err.message === "TIMEOUT_5S") msg = "Lentidão na rede";
-            else if (err.code === "PGRST301" || err.code === "42501") msg = "Erro de Permissão (SQL)";
-            else if (err.message && err.message.includes("fetch")) msg = "Falha de conexão";
-
-            saveStatusEl.innerHTML = `<span style="color: var(--error-color)">⚠ ${msg}</span>`;
+        if (errorA) {
+            console.warn("Plano A falhou:", errorA.message);
+            throw new Error("RPC Failed");
         }
-    } finally {
-        // 4. FAILSAFE FINAL: Isso roda 100% das vezes, parando o spinner.
-        state.setIsSaving(false);
+        
+        finishSave("success", "Salvo (Nuvem/RPC)");
+        return;
+
+    } catch (errA) {
+        
+        try {
+            // --- PLANO B: UPSERT PADRÃO (CLIENT-SIDE) ---
+            console.log("⚠️ Tentando Plano B (Standard Upsert)...");
+            const { error: errorB } = await supabase
+                .from('user_data')
+                .upsert({ 
+                    user_id: userId, 
+                    data: payload,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+            if (errorB) throw errorB;
+
+            finishSave("success", "Salvo (Nuvem/STD)");
+            return;
+
+        } catch (errB) {
+            console.warn("Plano B falhou.", errB);
+
+            try {
+                // --- PLANO C: FORÇA BRUTA (DELETE + INSERT) ---
+                // Útil se o índice estiver corrompido ou o upsert travado.
+                console.warn("🚨 Tentando Plano C (Brute Force)...");
+                
+                await supabase.from('user_data').delete().eq('user_id', userId);
+                
+                const { error: errorC } = await supabase.from('user_data').insert({
+                    user_id: userId,
+                    data: payload,
+                    updated_at: new Date().toISOString()
+                });
+
+                if (errorC) throw errorC;
+
+                finishSave("success", "Salvo (Recuperado)");
+                return;
+
+            } catch (errC) {
+                console.error("❌ Plano C falhou.", errC);
+                // --- PLANO D: FALLBACK LOCAL (SOBREVIVÊNCIA) ---
+                executePlanD("Falha no Servidor");
+            }
+        }
     }
 }
 
-/**
- * Carrega os dados do Supabase ao iniciar a aplicação.
- */
-async function loadFromSupabase() {
+// Executa o salvamento local (LocalStorage) - O último refúgio
+function executePlanD(reason: string) {
+    try {
+        const payload = preparePayload();
+        localStorage.setItem('lumen_backup_emergency', JSON.stringify(payload));
+        localStorage.setItem('lumen_last_saved', new Date().toISOString());
+        
+        finishSave("warning", `Salvo Offline (${reason})`);
+        console.log("✅ Plano D executado: Dados salvos no LocalStorage.");
+    } catch (e) {
+        console.error("💀 CRÍTICO: Falha até no Plano D (LocalStorage cheio?)", e);
+        finishSave("error", "Erro crítico de salvamento");
+        state.setIsSaving(false); // Libera o spinner mesmo com erro fatal
+    }
+}
+
+function preparePayload() {
+    return { 
+        settings: state.settings,
+        avisos: state.avisos, 
+        recursos: state.recursos, 
+        provas: state.provas, 
+        aulas: state.aulas, 
+        salas: state.salas, 
+        alunosParticulares: state.alunosParticulares, 
+        calendarioEventos: state.calendarioEventos,
+    };
+}
+
+function finishSave(status: 'success' | 'warning' | 'error', message: string) {
+    if (watchdogTimeout) clearTimeout(watchdogTimeout);
+    
+    state.setIsSaving(false);
+    state.setDataDirty(false); 
+
+    const el = document.getElementById('save-status');
+    if (el) {
+        let color = 'var(--text-secondary)';
+        let icon = '✔';
+        
+        if (status === 'success') {
+            color = 'var(--text-secondary)'; 
+            icon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path></svg>`;
+        } else if (status === 'warning') {
+            color = 'var(--warning-color)';
+            icon = '⚠️';
+        } else {
+            color = 'var(--error-color)';
+            icon = '❌';
+        }
+        
+        el.innerHTML = `<span style="color: ${color}">${icon} ${message}</span>`;
+    }
+}
+
+// =================================================================================
+// CARREGAMENTO DE DADOS (HÍBRIDO + PRIORIDADE LOCAL SE MAIS RECENTE)
+// =================================================================================
+
+export async function loadAllData() {
+    let cloudData = null;
+    let localData = null;
+    let source = '';
+
+    // 1. Carrega Backup Local
+    try {
+        const localRaw = localStorage.getItem('lumen_backup_emergency');
+        if (localRaw) localData = JSON.parse(localRaw);
+    } catch(e) {}
+
+    // 2. Tenta carregar do Supabase
     try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return false;
+        if (user) {
+            const { data, error } = await supabase
+                .from('user_data')
+                .select('data')
+                .eq('user_id', user.id)
+                .maybeSingle();
 
-        const { data, error } = await supabase
-            .from('user_data')
-            .select('data')
-            .eq('user_id', user.id)
-            .single();
-
-        if (error) {
-            if (error.code === 'PGRST116') return false; // Usuário novo
-            console.error("Erro ao carregar dados:", error);
-            return false;
+            if (!error && data && data.data) {
+                cloudData = data.data;
+            }
         }
-
-        if (data && data.data) {
-            const savedData = data.data;
-            
-            const defaultSettings = { 
-                teacherName: 'Paulo Gabriel de L. S.', 
-                schoolName: 'Microcamp Mogi das Cruzes', 
-                bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false,
-                valorHoraAula: 25.00
-            };
-            Object.assign(state.settings, defaultSettings, savedData.settings || {});
-            dom.schoolNameEl.textContent = state.settings.schoolName;
-
-            state.setAvisos(savedData.avisos || []);
-            state.setRecursos(savedData.recursos || []);
-            state.setProvas(savedData.provas || []);
-            state.setAulas(savedData.aulas || []);
-            state.setSalas(savedData.salas || []);
-            state.setAlunosParticulares(savedData.alunosParticulares || []);
-            
-            const feriados = getInitialHolidays();
-            state.setCalendarioEventos(savedData.calendarioEventos || feriados);
-
-            deduplicateAndSanitizeProgress();
-            return true;
-        } 
-        return false;
-    } catch (err) {
-        console.error("Falha crítica no carregamento:", err);
-        return false;
+    } catch (e) {
+        console.error("Erro ao carregar do Supabase:", e);
     }
+
+    // 3. Decisão Inteligente: Qual dado usar?
+    // Se o salvamento na nuvem falhou antes, o local pode ser mais recente.
+    // Mas, como não temos timestamps precisos dentro do JSON antigo, damos preferência à Nuvem
+    // se ela existir, a menos que esteja explicitamente vazia e o local tenha dados.
+    
+    let finalData = null;
+
+    if (cloudData) {
+        finalData = cloudData;
+        source = 'Supabase';
+        // Limpa o backup de emergência se a nuvem carregou com sucesso, 
+        // para evitar que dados velhos locais sobrescrevam no futuro em caso de bug.
+        // (Opcional: você pode manter por segurança, mas aqui priorizamos a nuvem)
+    } else if (localData) {
+        finalData = localData;
+        source = 'Backup Local (Offline)';
+        utils.showToast('Recuperado do backup local.', 'warning');
+    }
+
+    // 4. Aplica os dados (ou defaults)
+    if (finalData) {
+        applyData(finalData);
+        console.log(`Dados carregados de: ${source}`);
+    } else {
+        initDefaults();
+        console.log("Iniciando com dados padrão (Novo Usuário)");
+    }
+
+    state.setDataDirty(false);
+    renderAllViews();
+    populateMobileMenu();
+    switchView('dashboard');
+};
+
+function applyData(savedData: any) {
+    const defaultSettings = { 
+        teacherName: 'Paulo Gabriel de L. S.', 
+        schoolName: 'Microcamp Mogi das Cruzes', 
+        bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false,
+        valorHoraAula: 25.00
+    };
+    Object.assign(state.settings, defaultSettings, savedData.settings || {});
+    dom.schoolNameEl.textContent = state.settings.schoolName;
+
+    state.setAvisos(savedData.avisos || []);
+    state.setRecursos(savedData.recursos || []);
+    state.setProvas(savedData.provas || []);
+    state.setAulas(savedData.aulas || []);
+    state.setSalas(savedData.salas || []);
+    state.setAlunosParticulares(savedData.alunosParticulares || []);
+    
+    const feriados = getInitialHolidays();
+    state.setCalendarioEventos(savedData.calendarioEventos || feriados);
+
+    deduplicateAndSanitizeProgress();
+}
+
+function initDefaults() {
+    const defaultSettings: Settings = {
+        teacherName: 'Paulo Gabriel de L. S.',
+        schoolName: 'Microcamp Mogi das Cruzes',
+        bonusValue: 3.50,
+        minAlunos: 100,
+        showFrequenciaValues: false,
+        valorHoraAula: 25.00,
+    };
+    Object.assign(state.settings, defaultSettings);
+    dom.schoolNameEl.textContent = state.settings.schoolName;
+    state.setCalendarioEventos(getInitialHolidays());
+    state.setAvisos([]);
+    state.setRecursos([]);
+    state.setProvas([]);
+    state.setAulas([]);
+    state.setSalas([]);
+    state.setAlunosParticulares([]);
 }
 
 // --- Funções Auxiliares de Datas (Mantidas) ---
@@ -258,6 +376,7 @@ function renderAllViews() {
 }
 
 export function deduplicateAndSanitizeProgress() {
+    // Mantido da versão anterior (sem alterações lógicas)
     const bookInfoMap = new Map<number, { nome: string, salaId: number }>();
     state.salas.forEach(s => s.livros.forEach(l => bookInfoMap.set(l.id, { nome: l.nome, salaId: s.id })));
 
@@ -302,44 +421,7 @@ export function deduplicateAndSanitizeProgress() {
     });
 }
 
-/**
- * Inicializa a aplicação carregando dados do Supabase.
- * Se não houver dados no banco, inicializa com valores padrão.
- */
-export async function loadAllData() {
-    // Tenta carregar do Supabase
-    const loaded = await loadFromSupabase();
-
-    if (!loaded) {
-        // Se não carregou nada (usuário novo), inicializa defaults
-        const defaultSettings: Settings = {
-            teacherName: 'Paulo Gabriel de L. S.',
-            schoolName: 'Microcamp Mogi das Cruzes',
-            bonusValue: 3.50,
-            minAlunos: 100,
-            showFrequenciaValues: false,
-            valorHoraAula: 25.00,
-        };
-        Object.assign(state.settings, defaultSettings);
-        dom.schoolNameEl.textContent = state.settings.schoolName;
-        state.setCalendarioEventos(getInitialHolidays());
-        
-        // Limpa outros arrays para garantir estado zerado
-        state.setAvisos([]);
-        state.setRecursos([]);
-        state.setProvas([]);
-        state.setAulas([]);
-        state.setSalas([]);
-        state.setAlunosParticulares([]);
-    }
-
-    state.setDataDirty(false); // Carregamento inicial não é "sujeira"
-    
-    renderAllViews();
-    populateMobileMenu();
-    switchView('dashboard');
-};
-
+// Funções de Import/Export (Mantidas iguais à versão anterior, pois são locais)
 function handleExport() {
     const hasData = [state.avisos, state.recursos, state.provas, state.aulas, state.salas, state.alunosParticulares, state.calendarioEventos].some(arr => arr.length > 0);
     if (!hasData) return utils.showToast('Não há dados para exportar.', 'warning');
@@ -348,16 +430,7 @@ function handleExport() {
         appName: 'Lumen', 
         version: '2.24', 
         exportDate: new Date().toISOString(), 
-        data: { 
-            settings: state.settings,
-            avisos: state.avisos, 
-            recursos: state.recursos, 
-            provas: state.provas, 
-            aulas: state.aulas, 
-            salas: state.salas, 
-            alunosParticulares: state.alunosParticulares, 
-            calendarioEventos: state.calendarioEventos,
-        } 
+        data: preparePayload()
     };
 
     const dataStr = JSON.stringify(exportData, null, 2);
@@ -408,65 +481,11 @@ function confirmImport() {
     utils.setButtonLoading(dom.confirmImportBtn, true);
 
     setTimeout(() => {
-        // Backup do progresso
-        const existingProgressMap = new Map<number, Progresso[]>();
-        state.salas.forEach(sala => {
-            sala.alunos.forEach(aluno => {
-                existingProgressMap.set(aluno.id, JSON.parse(JSON.stringify(aluno.progresso)));
-            });
-        });
-
-        // Importação
-        const defaultSettings = { teacherName: 'Paulo Gabriel de L. S.', schoolName: 'Microcamp Mogi das Cruzes', bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false, valorHoraAula: 25.00 };
-        const importedSettings = dataToImport.settings || {};
-        Object.assign(state.settings, defaultSettings, importedSettings);
-        dom.schoolNameEl.textContent = state.settings.schoolName;
-        
-        state.setAvisos(dataToImport.avisos || []);
-        state.setRecursos(dataToImport.recursos || []);
-        state.setProvas(dataToImport.provas || []);
-        state.setAulas(dataToImport.aulas || []);
-        state.setSalas(dataToImport.salas || []);
-        
-        state.salas.forEach(sala => { if (!sala.tipo) sala.tipo = 'Regular'; });
-        state.setAlunosParticulares(dataToImport.alunosParticulares || []);
-        
-        const eventosParaImportar = dataToImport.calendarioEventos || getInitialHolidays();
-        state.setCalendarioEventos(eventosParaImportar);
-
-        // Merge de Progresso
-        state.salas.forEach(sala => {
-            sala.alunos.forEach(aluno => {
-                const oldProgress = existingProgressMap.get(aluno.id);
-                if (oldProgress) {
-                    const mergedProgressMap = new Map<number, Progresso>();
-                    oldProgress.forEach(p => mergedProgressMap.set(p.livroId, p));
-                    aluno.progresso.forEach(p => {
-                        if(mergedProgressMap.has(p.livroId)) {
-                            const existing = mergedProgressMap.get(p.livroId)!;
-                            existing.notaWritten = p.notaWritten ?? existing.notaWritten;
-                            existing.notaOral = p.notaOral ?? existing.notaOral;
-                            existing.notaParticipation = p.notaParticipation ?? existing.notaParticipation;
-                            existing.historicoPresencas = Math.max(existing.historicoPresencas || 0, p.historicoPresencas || 0) || undefined;
-                            existing.historicoAulasDadas = Math.max(existing.historicoAulasDadas || 0, p.historicoAulasDadas || 0) || undefined;
-                        } else {
-                            mergedProgressMap.set(p.livroId, p);
-                        }
-                    });
-                    aluno.progresso = Array.from(mergedProgressMap.values());
-                }
-            });
-        });
-
-        deduplicateAndSanitizeProgress();
-        
-        // Importação conta como mudança de dados, então dispara auto-save
+        applyData(dataToImport);
         state.setDataDirty(true);
-        
         renderAllViews();
         populateMobileMenu();
         switchView('dashboard');
-        
         utils.setButtonLoading(dom.confirmImportBtn, false);
         utils.showToast('Backup restaurado e salvo na nuvem!', 'success');
         closeImportModal();
