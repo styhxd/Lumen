@@ -200,6 +200,9 @@ function generateEvolutionChart(currentMonth: string): string {
     const height = 280; // Aumentado um pouco para caber melhor no card
     const padding = 40;
     const maxVal = Math.max(...monthsData.map(d => d.value), 100) * 1.1; 
+    
+    // Fonte padrão do sistema para evitar distorção
+    const chartFont = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
     const points = monthsData.map((d, i) => {
         const x = padding + (i / (monthsData.length - 1)) * (width - 2 * padding);
@@ -222,14 +225,15 @@ function generateEvolutionChart(currentMonth: string): string {
         return `
             ${horistaHalo}
             <circle cx="${x}" cy="${y}" r="${dotRadius}" fill="var(--bg-color)" stroke="${dotStroke}" stroke-width="2" />
-            <text x="${x}" y="${y - 15}" text-anchor="middle" fill="var(--text-color)" font-size="13" font-weight="bold">R$${Math.round(d.value)}</text>
-            <text x="${x}" y="${y - 4}" text-anchor="middle" fill="var(--text-secondary)" font-size="10">${d.students} alunos</text>
-            <text x="${x}" y="${height - 15}" text-anchor="middle" fill="var(--text-secondary)" font-size="12" font-weight="500" style="text-transform: uppercase;">${d.label}</text>
+            <text x="${x}" y="${y - 15}" text-anchor="middle" fill="var(--text-color)" font-family="${chartFont}" font-size="13" font-weight="bold">R$${Math.round(d.value)}</text>
+            <text x="${x}" y="${y - 4}" text-anchor="middle" fill="var(--text-secondary)" font-family="${chartFont}" font-size="10">${d.students} alunos</text>
+            <text x="${x}" y="${height - 15}" text-anchor="middle" fill="var(--text-secondary)" font-family="${chartFont}" font-size="12" font-weight="500" style="text-transform: uppercase;">${d.label}</text>
         `;
     }).join('');
 
+    // Ajustado preserveAspectRatio para "xMidYMid meet" para evitar letras esticadas
     return `
-        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow: visible;">
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="overflow: visible;">
             <defs>
                 <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stop-color="var(--primary-blue)" stop-opacity="0.3"/>
