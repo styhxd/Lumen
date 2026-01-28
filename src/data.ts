@@ -1,18 +1,36 @@
-
 /*
  * =================================================================================
  * MÓDULO DE GERENCIAMENTO DE DADOS (src/data.ts)
+ * Copyright (c) 2025 Paulo Gabriel de L. S.
+ * 
+ * Este arquivo é o núcleo de dados da aplicação Lumen. Ele gerencia todo o ciclo
+ * de vida dos dados:
+ * - Carregamento inicial (setup padrão).
+ * - Funções de importação e exportação de dados via arquivos JSON.
+ * - Lógica de arrastar e soltar (Drag and Drop) para importação.
+ * - Validação e processamento de arquivos importados.
+ * A centralização dessas responsabilidades garante consistência e facilita a
+ * manutenção e a depuração de tudo que envolve a persistência de dados.
  * =================================================================================
  */
 
-import * as state from './state.ts';
-import * as dom from './dom.ts';
-import * as utils from './utils.ts';
-import { populateMobileMenu, switchView } from './ui.ts';
-import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso } from './types.ts';
-import { supabase } from './supabaseClient.ts';
+/* 
+  Copyright (c) 2025 Paulo Gabriel de L. S.
+  Data loading, saving, import and export for Lumen application.
+*/
+// =================================================================================
+// IMPORTAÇÕES ESTRATÉGICAS
+// =================================================================================
+// Importamos os módulos essenciais para a manipulação de dados e a atualização da UI.
+import * as state from './state.ts';        // O estado global da aplicação (os arrays de dados, configurações, etc.).
+import * as dom from './dom.ts';            // Seletores de elementos do DOM para interagir com a página.
+import * as utils from './utils.ts';        // Funções utilitárias, como exibir toasts e controlar o estado de loading de botões.
+import { populateMobileMenu, switchView } from './ui.ts'; // Funções para atualizar componentes específicos da UI.
+import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso } from './types.ts';     // Tipos de dados para garantir a consistência.
 
-// Imports de renderização (mantidos)
+// Importamos TODAS as funções de renderização das views. Isso é crucial para que,
+// após uma grande alteração nos dados (como uma importação), possamos
+// re-renderizar a aplicação inteira e garantir que a UI reflita o novo estado.
 import { renderAlunosView } from './views/alunos.ts';
 import { renderAulasExtrasView } from './views/aulasExtras.ts';
 import { renderAulaDoDia, renderAulasArquivadas } from './views/aulaDoDia.ts';
@@ -24,393 +42,37 @@ import { renderCalendario } from './views/calendario.ts';
 import { renderNotasView } from './views/notas.ts';
 import { renderReportsView } from './views/reports.ts';
 
+// Variável temporária para armazenar os dados do arquivo JSON antes da confirmação final do usuário.
+// Isso evita a substituição acidental dos dados atuais.
 let dataToImport: any = null;
-let saveTimeout: any = null;
-let isSaveInProgress = false;
 
-const STORAGE_KEY = 'lumen_data_v2';
+/**
+ * =================================================================================
+ * LÓGICA DE FERIADOS NACIONAIS
+ * =================================================================================
+ * Funções auxiliares para calcular e gerar uma lista de feriados nacionais
+ * brasileiros dinamicamente para os próximos anos. Isso garante que o calendário
+ * esteja sempre atualizado sem a necessidade de intervenção manual.
+ */
 
-// =================================================================================
-// SISTEMA DE AUTODIAGNÓSTICO (AS 4 FASES)
-// =================================================================================
-
-export async function runSystemDiagnostics() {
-    console.clear();
-    console.log("%c INICIANDO DIAGNÓSTICO DO SISTEMA LUMEN ", "background: #222; color: #bada55; font-size: 16px; padding: 10px; border-radius: 5px;");
-    let errors = [];
-
-    try {
-        // --- FASE 1: AUTENTICAÇÃO ---
-        console.group("%c FASE 1: Autenticação ", "color: #38bdf8; font-weight: bold; font-size: 12px;");
-        
-        // Teste 1.1: Cliente Inicializado
-        if (supabase) {
-            console.log("✅ [1.1] Cliente Supabase: Inicializado.");
-        } else {
-            console.error("❌ [1.1] Cliente Supabase: FALHA CRÍTICA. Variável nula.");
-            errors.push("Cliente Supabase não carregou.");
-        }
-
-        // Teste 1.2: Sessão Local
-        const sessionResponse = await supabase.auth.getSession();
-        if (sessionResponse.data.session) {
-            console.log("✅ [1.2] Sessão Local: Token presente (JWT).");
-        } else {
-            console.warn("⚠️ [1.2] Sessão Local: Nenhuma sessão encontrada. Usuário não logado.");
-            errors.push("Sem sessão local (Faça login novamente).");
-        }
-
-        // Teste 1.3: Validação no Servidor (GetUser)
-        const userResponse = await supabase.auth.getUser();
-        if (userResponse.data.user) {
-            console.log(`✅ [1.3] Validação Servidor: Usuário Confirmado (ID: ${userResponse.data.user.id})`);
-        } else {
-            console.error(`❌ [1.3] Validação Servidor: Token inválido ou expirado. Erro: ${userResponse.error?.message}`);
-            errors.push("Sessão expirada no servidor.");
-        }
-        console.groupEnd();
-
-
-        // --- FASE 2: DADOS E PAYLOAD ---
-        console.group("%c FASE 2: Gatilho e Dados ", "color: #f59e0b; font-weight: bold; font-size: 12px;");
-        
-        // Teste 2.1: Estado Sujo
-        console.log(`ℹ️ [2.1] Flag de Alteração (isDataDirty): ${state.isDataDirty}`);
-
-        // Teste 2.2: Geração do JSON
-        const payload = preparePayload();
-        if (payload && typeof payload === 'object') {
-            console.log("✅ [2.2] Preparação do Pacote: JSON gerado com sucesso.");
-        } else {
-            console.error("❌ [2.2] Preparação do Pacote: Falha ao gerar JSON.");
-            errors.push("Erro interno ao empacotar dados.");
-        }
-
-        // Teste 2.3: Tamanho do Payload
-        const jsonString = JSON.stringify(payload);
-        const sizeKB = (new Blob([jsonString]).size / 1024).toFixed(2);
-        console.log(`✅ [2.3] Tamanho do Pacote: ${sizeKB} KB (Limite seguro ~1000KB).`);
-        console.groupEnd();
-
-
-        // --- FASE 3: TRANSPORTE ---
-        console.group("%c FASE 3: Transporte (Rede) ", "color: #a78bfa; font-weight: bold; font-size: 12px;");
-
-        // Teste 3.1: Status Online
-        if (navigator.onLine) {
-            console.log("✅ [3.1] Navegador: Online.");
-        } else {
-            console.error("❌ [3.1] Navegador: OFFLINE. Impossível salvar.");
-            errors.push("Sem conexão com a internet.");
-        }
-
-        // Teste 3.2: User ID Disponível
-        const userId = userResponse.data.user?.id;
-        if (userId) {
-            console.log("✅ [3.2] ID do Usuário: Identificado para envio.");
-        } else {
-            console.error("❌ [3.2] ID do Usuário: NULO. Abortando transporte.");
-            errors.push("ID de usuário perdido.");
-        }
-        console.groupEnd();
-
-
-        // --- FASE 4: BANCO DE DADOS (SUPABASE) ---
-        console.group("%c FASE 4: Banco de Dados (Supabase) ", "color: #ef4444; font-weight: bold; font-size: 12px;");
-
-        if (userId) {
-            // Teste 4.1: Leitura (SELECT) - Verifica se a tabela existe e RLS de leitura
-            const { data: selectData, error: selectError } = await supabase
-                .from('user_data')
-                .select('user_id')
-                .eq('user_id', userId)
-                .maybeSingle();
-
-            if (selectError) {
-                console.error("❌ [4.1] Teste de Leitura: FALHOU.", selectError);
-                if (selectError.code === '42P01') errors.push("ERRO CRÍTICO: Tabela 'user_data' não existe no Supabase.");
-                else if (selectError.code === '42501') errors.push("ERRO RLS: Permissão negada para LER dados.");
-                else errors.push(`Erro Supabase (Leitura): ${selectError.message}`);
-            } else {
-                console.log(`✅ [4.1] Teste de Leitura: OK. ${selectData ? 'Registro encontrado.' : 'Tabela vazia (primeiro acesso).'}`);
-            }
-
-            // Teste 4.2: Escrita (UPSERT) - Tenta salvar de verdade
-            console.log("⏳ [4.2] Tentando gravar dados...");
-            const { error: upsertError } = await supabase
-                .from('user_data')
-                .upsert({ 
-                    user_id: userId, 
-                    email: userResponse.data.user?.email, 
-                    data: payload, 
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
-
-            if (upsertError) {
-                console.error("❌ [4.2] Teste de Escrita: FALHOU.", upsertError);
-                if (upsertError.code === '42501') errors.push("ERRO RLS: Permissão negada para GRAVAR/CRIAR. Verifique a Policy 'Enable all actions'.");
-                else errors.push(`Erro Supabase (Escrita): ${upsertError.message}`);
-            } else {
-                console.log("✅ [4.2] Teste de Escrita: SUCESSO! Dados salvos.");
-            }
-        } else {
-            console.warn("⚠️ [4.x] Testes de Banco pulados por falta de autenticação.");
-        }
-        console.groupEnd();
-
-    } catch (e: any) {
-        console.error("ERRO INESPERADO NO DIAGNÓSTICO:", e);
-        errors.push(e.message);
-    }
-
-    if (errors.length > 0) {
-        alert(`DIAGNÓSTICO FINALIZADO COM ERROS:\n\n${errors.join('\n')}\n\nAbra o Console (F12) para detalhes técnicos.`);
-    } else {
-        alert("DIAGNÓSTICO FINALIZADO: Tudo parece correto! Seus dados foram salvos com sucesso na Fase 4.");
-    }
-}
-
-// =================================================================================
-// LÓGICA DE SALVAMENTO (AUTO-SAVE)
-// =================================================================================
-
-export function triggerAutoSave() {
-    if (isSaveInProgress) return;
-    if (saveTimeout) clearTimeout(saveTimeout);
-    
-    updateSaveStatus('waiting'); // "Alterações pendentes..."
-
-    // Debounce de 3 segundos
-    saveTimeout = setTimeout(async () => {
-        await executeRobustSave();
-    }, 3000);
-}
-
-// Função exportada para o botão manual "Salvar Agora"
-export async function forceSave() {
-    if (saveTimeout) clearTimeout(saveTimeout);
-    await executeRobustSave();
-}
-
-async function executeRobustSave() {
-    if (isSaveInProgress) return;
-    isSaveInProgress = true;
-    updateSaveStatus('saving');
-
-    const payload = preparePayload();
-
-    try {
-        // 1. BACKUP LOCAL (Sempre executa por segurança)
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        } catch (localErr) {
-            console.warn("Falha no backup local:", localErr);
-        }
-
-        if (!navigator.onLine) {
-            updateSaveStatus('offline');
-            isSaveInProgress = false;
-            return;
-        }
-
-        // 2. VERIFICA SESSÃO (CRÍTICO)
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError || !session?.user) {
-            console.error("Erro de Sessão:", sessionError);
-            updateSaveStatus('error', 'Sem login');
-            // Se não tem sessão, tenta forçar o usuário a ver isso
-            utils.showToast("Sessão expirada. Recarregue a página e faça login.", "error");
-            isSaveInProgress = false;
-            return;
-        }
-
-        const user = session.user;
-
-        // 3. SALVAR NO SUPABASE (Upsert)
-        console.log("Tentando salvar dados para usuário:", user.id);
-
-        const dbPayload = { 
-            user_id: user.id, 
-            email: user.email, 
-            data: payload, 
-            updated_at: new Date().toISOString()
-        };
-
-        const { error } = await supabase
-            .from('user_data')
-            .upsert(dbPayload, { onConflict: 'user_id' });
-
-        if (error) {
-            console.error("ERRO SUPABASE DETALHADO NO SAVE:", error);
-            if (error.code === '42P01') {
-                alert("ERRO: A tabela 'user_data' não existe. Rode o script SQL no Supabase.");
-            } else if (error.code === '42501') {
-                alert("ERRO: Permissão negada (RLS). Verifique as Policies no Supabase.");
-            }
-            throw error;
-        }
-
-        // Sucesso!
-        console.log("Salvo com sucesso no Supabase!");
-        state.setDataDirty(false);
-        updateSaveStatus('success');
-
-    } catch (err: any) {
-        console.error("FALHA CRÍTICA AO SALVAR:", err);
-        updateSaveStatus('error', err.message || 'Erro desconhecido');
-    } finally {
-        isSaveInProgress = false;
-    }
-}
-
-function updateSaveStatus(status: 'waiting' | 'saving' | 'success' | 'error' | 'offline', msg?: string) {
-    state.setIsSaving(status === 'saving');
-    
-    const el = document.getElementById('save-status');
-    if (!el) return;
-
-    let content = '';
-    
-    switch (status) {
-        case 'waiting':
-            content = `<span style="color: var(--warning-color)">• Alterações pendentes</span>`;
-            break;
-        case 'saving':
-            content = `<span class="spinner" style="display:inline-block; width:12px; height:12px; border-width:2px; border-color:var(--primary-blue); border-right-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span> <span style="color: var(--primary-blue)">Salvando...</span>`;
-            break;
-        case 'success':
-            content = `<span style="color: #22c55e">✔ Salvo na Nuvem</span>`;
-            break;
-        case 'error':
-            content = `<span style="color: var(--error-color); font-weight:bold; cursor:pointer;" title="${msg || 'Clique para ver detalhes'}">❌ Erro (Clique para tentar)</span>`;
-            el.onclick = forceSave;
-            break;
-        case 'offline':
-            content = `<span style="color: var(--text-secondary)">☁️ Salvo Offline</span>`;
-            break;
-    }
-    
-    el.innerHTML = content;
-}
-
-function preparePayload() {
-    // Deep clone simples para garantir snapshot limpo
-    return JSON.parse(JSON.stringify({ 
-        settings: state.settings,
-        avisos: state.avisos, 
-        recursos: state.recursos, 
-        provas: state.provas, 
-        aulas: state.aulas, 
-        salas: state.salas, 
-        alunosParticulares: state.alunosParticulares, 
-        calendarioEventos: state.calendarioEventos,
-    }));
-}
-
-// =================================================================================
-// CARREGAMENTO DE DADOS
-// =================================================================================
-
-export async function loadAllData() {
-    let finalData = null;
-    let source = 'Novo Perfil';
-
-    // 1. Tenta Nuvem Primeiro
-    try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-            const { data, error } = await supabase
-                .from('user_data')
-                .select('data')
-                .eq('user_id', session.user.id)
-                .maybeSingle();
-
-            if (error) {
-                console.error("Erro ao ler da nuvem:", error);
-                utils.showToast(`Erro ao carregar da nuvem: ${error.message}`, "error");
-            } else if (data && data.data) {
-                finalData = data.data;
-                source = 'Nuvem';
-            }
-        }
-    } catch (e) {
-        console.warn("Falha de conexão ao carregar:", e);
-    }
-
-    // 2. Fallback Local
-    if (!finalData) {
-        try {
-            const localRaw = localStorage.getItem(STORAGE_KEY);
-            if (localRaw) {
-                finalData = JSON.parse(localRaw);
-                source = 'Local';
-            }
-        } catch(e) { console.error("Erro leitura local", e); }
-    }
-
-    // 3. Aplica
-    if (finalData) {
-        applyData(finalData);
-        console.log(`Dados carregados de: ${source}`);
-        if (source === 'Local') {
-            utils.showToast('Dados locais carregados. (Sincronização pendente)', 'warning');
-            state.setDataDirty(true); // Força sync na próxima oportunidade
-        }
-    } else {
-        initDefaults();
-    }
-
-    renderAllViews();
-    populateMobileMenu();
-    switchView('dashboard');
-};
-
-function applyData(savedData: any) {
-    const defaultSettings = { 
-        teacherName: 'Paulo Gabriel de L. S.', 
-        schoolName: 'Microcamp Mogi das Cruzes', 
-        bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false,
-        valorHoraAula: 25.00
-    };
-    Object.assign(state.settings, defaultSettings, savedData.settings || {});
-    dom.schoolNameEl.textContent = state.settings.schoolName;
-
-    state.setAvisos(savedData.avisos || []);
-    state.setRecursos(savedData.recursos || []);
-    state.setProvas(savedData.provas || []);
-    state.setAulas(savedData.aulas || []);
-    state.setSalas(savedData.salas || []);
-    state.setAlunosParticulares(savedData.alunosParticulares || []);
-    
-    const feriados = getInitialHolidays();
-    state.setCalendarioEventos(savedData.calendarioEventos || feriados);
-
-    deduplicateAndSanitizeProgress();
-}
-
-function initDefaults() {
-    const defaultSettings: Settings = {
-        teacherName: 'Paulo Gabriel de L. S.',
-        schoolName: 'Microcamp Mogi das Cruzes',
-        bonusValue: 3.50,
-        minAlunos: 100,
-        showFrequenciaValues: false,
-        valorHoraAula: 25.00,
-    };
-    Object.assign(state.settings, defaultSettings);
-    dom.schoolNameEl.textContent = state.settings.schoolName;
-    state.setCalendarioEventos(getInitialHolidays());
-}
-
-// Funções Auxiliares de Datas (mantidas)
+/**
+ * Adiciona um número de dias a um objeto Date, tratando corretamente a transição entre meses e anos.
+ * @param date - A data inicial.
+ * @param days - O número de dias a serem adicionados (pode ser negativo).
+ * @returns Um novo objeto Date com a data resultante.
+ */
 const addDays = (date: Date, days: number): Date => {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
     return result;
 };
 
+/**
+ * Calcula o Domingo de Páscoa para um determinado ano usando o algoritmo de Meeus/Jones/Butcher.
+ * A data da Páscoa é a base para calcular outros feriados móveis como Carnaval e Corpus Christi.
+ * @param year - O ano para o qual a Páscoa será calculada.
+ * @returns Um objeto Date representando o Domingo de Páscoa.
+ */
 const getEaster = (year: number): Date => {
     const a = year % 19;
     const b = Math.floor(year / 100);
@@ -426,17 +88,30 @@ const getEaster = (year: number): Date => {
     const m = Math.floor((a + 11 * h + 22 * l) / 451);
     const month = Math.floor((h + l - 7 * m + 114) / 31);
     const day = ((h + l - 7 * m + 114) % 31) + 1;
+    // O mês no objeto Date do JavaScript é baseado em zero (0-11), por isso a subtração.
     return new Date(year, month - 1, day);
 };
 
+/**
+ * Retorna uma lista inicial de feriados nacionais brasileiros, calculada dinamicamente.
+ * Esta função garante que o calendário da aplicação já comece com informações úteis,
+ * melhorando a experiência do usuário logo no primeiro uso ou após um reset.
+ * Os feriados são gerados do ano atual até 2050.
+ * @returns {CalendarioEvento[]} Um array de objetos de eventos de calendário.
+ */
 const getInitialHolidays = (): CalendarioEvento[] => {
     const holidays: Omit<CalendarioEvento, 'id'>[] = [];
     const startYear = new Date().getFullYear();
     const endYear = 2050;
+
+    // Helper para formatar a data para o padrão YYYY-MM-DD, que é o formato
+    // esperado pelo restante da aplicação.
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
     for (let year = startYear; year <= endYear; year++) {
         const easter = getEaster(year);
+
+        // Feriados com data fixa
         const fixedHolidays = [
             { month: 0, day: 1, title: 'Confraternização Universal', type: 'feriado' as const, description: 'Feriado Nacional' },
             { month: 3, day: 21, title: 'Tiradentes', type: 'feriado' as const, description: 'Feriado Nacional' },
@@ -458,14 +133,38 @@ const getInitialHolidays = (): CalendarioEvento[] => {
             });
         });
 
-        holidays.push({ date: formatDate(addDays(easter, -47)), title: 'Carnaval', type: 'sem-aula', description: 'Ponto Facultativo Nacional' });
-        holidays.push({ date: formatDate(addDays(easter, -2)), title: 'Paixão de Cristo', type: 'feriado', description: 'Feriado Nacional' });
-        holidays.push({ date: formatDate(addDays(easter, 60)), title: 'Corpus Christi', type: 'sem-aula', description: 'Ponto Facultativo Nacional' });
+        // Feriados móveis (baseados na Páscoa)
+        holidays.push({
+            date: formatDate(addDays(easter, -47)),
+            title: 'Carnaval',
+            type: 'sem-aula',
+            description: 'Ponto Facultativo Nacional',
+        });
+        holidays.push({
+            date: formatDate(addDays(easter, -2)),
+            title: 'Paixão de Cristo',
+            type: 'feriado',
+            description: 'Feriado Nacional',
+        });
+        holidays.push({
+            date: formatDate(addDays(easter, 60)),
+            title: 'Corpus Christi',
+            type: 'sem-aula',
+            description: 'Ponto Facultativo Nacional',
+        });
     }
 
-    return holidays.sort((a, b) => a.date.localeCompare(b.date)).map((h, index) => ({ ...h, id: index + 1 }));
+    // Ordena todos os feriados por data e atribui IDs sequenciais para garantir unicidade.
+    return holidays
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((h, index) => ({ ...h, id: index + 1 }));
 };
 
+/**
+ * Função centralizada para re-renderizar todas as views da aplicação.
+ * É chamada após operações que alteram significativamente os dados (como a importação),
+ * garantindo que a interface do usuário seja completamente atualizada.
+ */
 function renderAllViews() {
     renderAvisos();
     renderRecursos();
@@ -480,16 +179,26 @@ function renderAllViews() {
     renderReportsView();
 }
 
+/**
+ * Função FAILSAFE para deduplicação e sanitização de progresso.
+ * Corrige problemas onde um aluno tem múltiplos registros para o mesmo livro (por nome),
+ * fundindo os dados para preservar notas e frequência.
+ */
 export function deduplicateAndSanitizeProgress() {
+    // 1. Mapa Global de Livros: ID -> {Nome, SalaId}
     const bookInfoMap = new Map<number, { nome: string, salaId: number }>();
     state.salas.forEach(s => s.livros.forEach(l => bookInfoMap.set(l.id, { nome: l.nome, salaId: s.id })));
 
+    let totalFixed = 0;
+
     state.salas.forEach(sala => {
         sala.alunos.forEach(aluno => {
+            // Agrupa o progresso pelo NOME NORMALIZADO do livro
             const byName = new Map<string, Progresso[]>();
             
             aluno.progresso.forEach(p => {
                 const info = bookInfoMap.get(p.livroId);
+                // Usa normalização agressiva para agrupar "Book 1" e "Book 1 " e "Book 1: Title" corretamente
                 const name = info ? utils.normalizeString(info.nome) : `orphaned_book_${p.livroId}`;
                 if (!byName.has(name)) byName.set(name, []);
                 byName.get(name)!.push(p);
@@ -501,51 +210,192 @@ export function deduplicateAndSanitizeProgress() {
                 if (entries.length === 1) {
                     sanitizedProgress.push(entries[0]);
                 } else {
+                    // DUPLICATA ENCONTRADA: Realiza o MERGE
+                    totalFixed++;
+                    
+                    // 1. Escolhe o ID alvo. Prioridade: ID que pertence à sala atual do aluno.
                     const currentSalaBookIds = sala.livros.map(l => l.id);
                     let targetEntry = entries.find(e => currentSalaBookIds.includes(e.livroId));
+                    
+                    // Se nenhum pertencer à sala atual, pega o último (assumindo ser o mais recente/relevante)
                     if (!targetEntry) targetEntry = entries[entries.length - 1];
 
+                    // Cria um novo objeto fundido baseado no alvo
                     const merged: Progresso = { ...targetEntry };
 
+                    // 2. Funde os dados de todas as entradas duplicadas
                     entries.forEach(e => {
-                        if (e === targetEntry) return;
+                        if (e === targetEntry) return; // Pula o próprio alvo (já copiado)
+
+                        // Preserva notas existentes (se merged for null e e for valor, usa e)
                         if (merged.notaWritten === null && e.notaWritten !== null) merged.notaWritten = e.notaWritten;
                         if (merged.notaOral === null && e.notaOral !== null) merged.notaOral = e.notaOral;
                         if (merged.notaParticipation === null && e.notaParticipation !== null) merged.notaParticipation = e.notaParticipation;
+
+                        // Preserva o maior valor de histórico/manual para não perder frequência
                         merged.manualAulasDadas = Math.max(merged.manualAulasDadas || 0, e.manualAulasDadas || 0) || undefined;
                         merged.manualPresencas = Math.max(merged.manualPresencas || 0, e.manualPresencas || 0) || undefined;
                         merged.historicoAulasDadas = Math.max(merged.historicoAulasDadas || 0, e.historicoAulasDadas || 0) || undefined;
                         merged.historicoPresencas = Math.max(merged.historicoPresencas || 0, e.historicoPresencas || 0) || undefined;
                     });
+
                     sanitizedProgress.push(merged);
                 }
             });
+
             aluno.progresso = sanitizedProgress;
+        });
+    });
+
+    // Chama a sanitização de datas antiga como complemento
+    sanitizeDates();
+    
+    if (totalFixed > 0) {
+        console.log(`[Lumen Sanitizer] Corrigidos ${totalFixed} casos de livros duplicados.`);
+    }
+}
+
+/**
+ * Higieniza as datas de progresso (função legada, mantida e chamada pela nova sanitização).
+ */
+function sanitizeDates() {
+    const getBookNumber = (bookName: string): number => {
+        if (!bookName) return 0;
+        const match = bookName.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 999;
+    };
+
+    const allBooksMap = new Map<number, { livro: Livro, sala: Sala }>();
+    state.salas.forEach(s => {
+        s.livros.forEach(l => {
+            allBooksMap.set(l.id, { livro: l, sala: s });
+        });
+    });
+
+    state.salas.forEach(sala => {
+        sala.alunos.forEach(aluno => {
+            if (aluno.progresso.length < 2) return;
+            const sortedProgress = [...aluno.progresso].sort((a, b) => {
+                const bookInfoA = allBooksMap.get(a.livroId);
+                const bookInfoB = allBooksMap.get(b.livroId);
+                if (!bookInfoA || !bookInfoB) return 0;
+                return getBookNumber(bookInfoA.livro.nome) - getBookNumber(bookInfoB.livro.nome);
+            });
+
+            for (let i = 0; i < sortedProgress.length - 1; i++) {
+                const currentProgress = sortedProgress[i];
+                const nextProgress = sortedProgress[i + 1];
+                const currentBookInfo = allBooksMap.get(currentProgress.livroId);
+                const nextBookInfo = allBooksMap.get(nextProgress.livroId);
+
+                if (!currentBookInfo || !nextBookInfo) continue;
+                const { livro: currentLivro } = currentBookInfo;
+                const { livro: nextLivro } = nextBookInfo;
+                
+                if (nextLivro.mesInicio <= currentLivro.mesInicio) {
+                    const [year, month] = currentLivro.mesInicio.split('-').map(Number);
+                    const correctedDate = new Date(year, month, 1);
+                    const newYear = correctedDate.getFullYear();
+                    const newMonth = (correctedDate.getMonth() + 1).toString().padStart(2, '0');
+                    nextLivro.mesInicio = `${newYear}-${newMonth}`;
+                }
+            }
         });
     });
 }
 
-// Funções de Import/Export (mantidas)
-function handleExport() {
-    const hasData = [state.avisos, state.recursos, state.provas, state.aulas, state.salas, state.alunosParticulares, state.calendarioEventos].some(arr => arr.length > 0);
-    if (!hasData) return utils.showToast('Não há dados para exportar.', 'warning');
 
+/**
+ * Inicializa ou reseta o estado da aplicação para seus valores padrão.
+ * Esta função limpa todos os arrays de dados, define as configurações iniciais
+ * e popula o calendário com os feriados padrão. Em seguida, atualiza toda a UI.
+ */
+export function loadAllData() {
+    const defaultSettings: Settings = {
+        teacherName: 'Paulo Gabriel de L. S.',
+        schoolName: 'Microcamp Mogi das Cruzes',
+        bonusValue: 3.50,
+        minAlunos: 100,
+        showFrequenciaValues: false,
+        valorHoraAula: 25.00,
+    };
+    Object.assign(state.settings, defaultSettings);
+    
+    dom.schoolNameEl.textContent = state.settings.schoolName;
+    
+    // Limpa todos os arrays de dados usando splice para manter a referência original.
+    state.avisos.splice(0, state.avisos.length);
+    state.recursos.splice(0, state.recursos.length);
+    state.provas.splice(0, state.provas.length);
+    state.aulas.splice(0, state.aulas.length);
+    state.salas.splice(0, state.salas.length);
+    state.alunosParticulares.splice(0, state.alunosParticulares.length);
+    
+    // Popula o calendário com os feriados iniciais.
+    state.calendarioEventos.splice(0, state.calendarioEventos.length, ...getInitialHolidays());
+    
+    // Executa a rotina de higienização dos dados.
+    deduplicateAndSanitizeProgress();
+
+    // Reseta a flag que indica se há alterações não salvas.
+    state.setDataDirty(false);
+    
+    // Atualiza a UI para refletir o estado limpo.
+    renderAllViews();
+    populateMobileMenu();
+    switchView('dashboard');
+};
+
+/**
+ * Manipula a exportação de todos os dados da aplicação para um arquivo JSON.
+ */
+function handleExport() {
+    // Verifica se há algum dado para ser exportado.
+    const hasData = [
+        state.avisos, state.recursos, state.provas, state.aulas, 
+        state.salas, state.alunosParticulares, state.calendarioEventos
+    ].some(arr => arr.length > 0);
+
+    // Se não houver dados e nenhuma alteração pendente, informa o usuário.
+    if (!hasData && !state.isDataDirty) {
+        return utils.showToast('Não há dados para exportar.', 'warning');
+    }
+
+    // Estrutura o objeto de exportação com metadados para validação na importação.
     const exportData = { 
         appName: 'Lumen', 
-        version: '2.24', 
+        version: '2.1.3', // Version Bump
         exportDate: new Date().toISOString(), 
-        data: preparePayload()
+        data: { 
+            settings: state.settings,
+            avisos: state.avisos, 
+            recursos: state.recursos, 
+            provas: state.provas, 
+            aulas: state.aulas, 
+            salas: state.salas, 
+            alunosParticulares: state.alunosParticulares, 
+            calendarioEventos: state.calendarioEventos,
+        } 
     };
 
+    // Converte o objeto para uma string JSON formatada.
     const dataStr = JSON.stringify(exportData, null, 2);
+    // Cria um link de download dinamicamente.
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([dataStr], { type: "application/json" }));
     a.download = `lumen-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click(); 
-    URL.revokeObjectURL(a.href);
-    utils.showToast('Backup baixado com sucesso.', 'success');
+    a.click(); // Simula o clique no link para iniciar o download.
+    URL.revokeObjectURL(a.href); // Libera a memória do objeto URL.
+    
+    // Após a exportação, consideramos que os dados estão "salvos".
+    state.setDataDirty(false);
+    utils.showToast('Exportação iniciada. O arquivo foi salvo.', 'success');
 }
 
+/**
+ * Processa um arquivo selecionado para importação.
+ * @param file O arquivo JSON a ser processado.
+ */
 function processFile(file: File) {
     if (!file) return;
     const reader = new FileReader();
@@ -555,52 +405,142 @@ function processFile(file: File) {
             const result = e.target?.result;
             if (typeof result === 'string') {
                 const parsedData = JSON.parse(result);
+                // Valida se o arquivo JSON tem a estrutura esperada do Lumen.
                 if (parsedData && parsedData.appName === 'Lumen' && parsedData.data) {
-                    dataToImport = parsedData.data;
-                    dom.importConfirmModal.classList.add('visible');
+                    dataToImport = parsedData.data; // Armazena os dados temporariamente.
+                    dom.importConfirmModal.classList.add('visible'); // Mostra o modal de confirmação.
                 } else {
-                    utils.showToast('Arquivo JSON inválido.', 'error');
+                    utils.showToast('Arquivo JSON inválido ou formato incorreto.', 'error');
                 }
             } else {
-                 utils.showToast('Erro ao ler o arquivo.', 'error');
+                 utils.showToast('Erro ao ler o arquivo: formato inesperado.', 'error');
             }
         } catch (error) { 
-            utils.showToast('Erro ao ler o arquivo JSON.', 'error'); 
+            utils.showToast('Erro ao ler o arquivo. Verifique o JSON.', 'error'); 
         } finally {
-            dom.importFileInput.value = '';
+            dom.importFileInput.value = ''; // Limpa o input de arquivo.
             utils.setButtonLoading(dom.importBtn, false);
         }
     };
     reader.readAsText(file);
 }
 
+/**
+ * Manipulador para o evento de seleção de arquivo via input.
+ */
 function handleFileImport(event: Event) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    if (file) processFile(file);
+    if (file) {
+        processFile(file);
+    }
 }
 
+/**
+ * Confirma e executa a importação dos dados, substituindo os dados atuais.
+ */
 function confirmImport() {
     if (!dataToImport) return;
     utils.setButtonLoading(dom.confirmImportBtn, true);
 
     setTimeout(() => {
-        applyData(dataToImport);
-        state.setDataDirty(true); // Força sincronização com a nuvem
+        // 1. FAZ UM BACKUP INTELIGENTE DO PROGRESSO DOS ALUNOS EXISTENTES
+        const existingProgressMap = new Map<number, Progresso[]>();
+        state.salas.forEach(sala => {
+            sala.alunos.forEach(aluno => {
+                existingProgressMap.set(aluno.id, JSON.parse(JSON.stringify(aluno.progresso)));
+            });
+        });
+
+        // 2. IMPORTAÇÃO DOS DADOS (SOBRESCREVENDO A ESTRUTURA PRINCIPAL)
+        const defaultSettings: Settings = { 
+            teacherName: 'Paulo Gabriel de L. S.', 
+            schoolName: 'Microcamp Mogi das Cruzes', 
+            bonusValue: 3.50, minAlunos: 100, showFrequenciaValues: false,
+            valorHoraAula: 25.00
+        };
+        const importedSettings = dataToImport.settings || {};
+        Object.assign(state.settings, defaultSettings, importedSettings);
+        dom.schoolNameEl.textContent = state.settings.schoolName;
+        
+        state.avisos.splice(0, state.avisos.length, ...(dataToImport.avisos || []));
+        state.recursos.splice(0, state.recursos.length, ...(dataToImport.recursos || []));
+        state.provas.splice(0, state.provas.length, ...(dataToImport.provas || []));
+        state.aulas.splice(0, state.aulas.length, ...(dataToImport.aulas || []));
+        state.salas.splice(0, state.salas.length, ...(dataToImport.salas || []));
+        
+        // Garante compatibilidade com JSONs antigos que não têm o campo 'tipo'
+        state.salas.forEach(sala => {
+            if (!sala.tipo) {
+                sala.tipo = 'Regular';
+            }
+        });
+
+        state.alunosParticulares.splice(0, state.alunosParticulares.length, ...(dataToImport.alunosParticulares || []));
+        
+        const eventosParaImportar = dataToImport.calendarioEventos || getInitialHolidays();
+        state.calendarioEventos.splice(0, state.calendarioEventos.length, ...eventosParaImportar);
+
+        // 3. FAZ A FUSÃO (MERGE) DO PROGRESSO - PRESERVA DADOS
+        // Essa etapa combina IDs antigos com novos, mas AINDA pode gerar duplicatas
+        // se os IDs forem diferentes para o mesmo livro. A sanitização corrige isso depois.
+        state.salas.forEach(sala => {
+            sala.alunos.forEach(aluno => {
+                const oldProgress = existingProgressMap.get(aluno.id);
+                if (oldProgress) {
+                    // Usa um Map para garantir que o progresso de cada ID seja único.
+                    const mergedProgressMap = new Map<number, Progresso>();
+                    
+                    // Adiciona o progresso antigo primeiro
+                    oldProgress.forEach(p => mergedProgressMap.set(p.livroId, p));
+                    
+                    // Adiciona/sobrescreve com o progresso do arquivo importado
+                    aluno.progresso.forEach(p => {
+                        // Se já existe dados para este ID, tenta manter o melhor (não sobrescreve com nulos)
+                        if(mergedProgressMap.has(p.livroId)) {
+                            const existing = mergedProgressMap.get(p.livroId)!;
+                            existing.notaWritten = p.notaWritten ?? existing.notaWritten;
+                            existing.notaOral = p.notaOral ?? existing.notaOral;
+                            existing.notaParticipation = p.notaParticipation ?? existing.notaParticipation;
+                            existing.historicoPresencas = Math.max(existing.historicoPresencas || 0, p.historicoPresencas || 0) || undefined;
+                            existing.historicoAulasDadas = Math.max(existing.historicoAulasDadas || 0, p.historicoAulasDadas || 0) || undefined;
+                            // (Mantém o objeto fundido no map)
+                        } else {
+                            mergedProgressMap.set(p.livroId, p);
+                        }
+                    });
+
+                    aluno.progresso = Array.from(mergedProgressMap.values());
+                }
+            });
+        });
+
+        // 4. HIGIENIZAÇÃO E DEDUPLICAÇÃO POR NOME (A CORREÇÃO DEFINITIVA)
+        deduplicateAndSanitizeProgress();
+        
+        state.setDataDirty(false);
+        
         renderAllViews();
         populateMobileMenu();
         switchView('dashboard');
+        
         utils.setButtonLoading(dom.confirmImportBtn, false);
-        utils.showToast('Backup restaurado! Salvando na nuvem...', 'success');
+        utils.showToast('Dados importados e otimizados!', 'success');
         closeImportModal();
     }, 500);
 }
 
+/**
+ * Fecha o modal de confirmação de importação e limpa a variável temporária.
+ */
 function closeImportModal() {
     dataToImport = null;
     dom.importConfirmModal.classList.remove('visible');
 }
 
+/**
+ * Inicializa todos os manipuladores de eventos relacionados à importação e exportação de dados.
+ */
 export function initDataHandlers() {
     dom.exportBtn?.addEventListener('click', handleExport);
     dom.importBtn?.addEventListener('click', () => dom.importFileInput.click());
@@ -609,16 +549,41 @@ export function initDataHandlers() {
     dom.cancelImportBtn?.addEventListener('click', closeImportModal);
     dom.importConfirmModal.addEventListener('click', (e) => { if (e.target === dom.importConfirmModal) closeImportModal(); });
     
-    let dragCounter = 0;
-    window.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; if(dragCounter > 0) dom.dragDropOverlay.classList.add('visible'); });
-    window.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dom.dragDropOverlay.classList.remove('visible'); });
-    window.addEventListener('dragover', (e) => { e.preventDefault(); });
+    // Lógica para a funcionalidade de Arrastar e Soltar (Drag and Drop)
+    let dragCounter = 0; // Contador para lidar com eventos de 'dragenter' e 'dragleave' em elementos filhos.
+    
+    window.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        dragCounter++;
+        if(dragCounter > 0) {
+            dom.dragDropOverlay.classList.add('visible');
+        }
+    });
+    
+    window.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter === 0) { // Só esconde a sobreposição quando o cursor realmente sai da janela.
+            dom.dragDropOverlay.classList.remove('visible');
+        }
+    });
+    
+    window.addEventListener('dragover', (e) => {
+        e.preventDefault(); // Prevenir o comportamento padrão do navegador é crucial para que o 'drop' funcione.
+    });
+    
     window.addEventListener('drop', (e) => {
-        e.preventDefault(); dragCounter = 0; dom.dragDropOverlay.classList.remove('visible');
+        e.preventDefault();
+        dragCounter = 0;
+        dom.dragDropOverlay.classList.remove('visible');
+        
         if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
             const file = e.dataTransfer.files[0];
-            if (file.type === 'application/json') processFile(file);
-            else utils.showToast('Por favor, solte apenas arquivos .json', 'error');
+            if (file.type === 'application/json') {
+                processFile(file);
+            } else {
+                utils.showToast('Por favor, solte apenas arquivos .json', 'error');
+            }
             e.dataTransfer.clearData();
         }
     });

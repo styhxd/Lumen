@@ -1,7 +1,16 @@
-
 /*
  * =================================================================================
  * MÓDULO DE GERENCIAMENTO DA INTERFACE DO USUÁRIO (src/ui.ts)
+ * Copyright (c) 2025 Paulo Gabriel de L. S.
+ *
+ * Este arquivo é responsável pela lógica central da interface do usuário (UI)
+ * que não pertence a uma "view" (tela) específica. Suas responsabilidades incluem:
+ * - Gerenciamento do tema da aplicação (claro/escuro).
+ * - Orquestração da navegação entre as diferentes telas.
+ * - Lógica de funcionamento do menu de navegação para dispositivos móveis.
+ *
+ * Manter essa lógica centralizada ajuda a separar as preocupações (Separation of
+ * Concerns), tornando o código mais fácil de entender e manter.
  * =================================================================================
  */
 
@@ -59,14 +68,15 @@ export function populateMobileMenu() {
     const searchBtnClone = document.getElementById('search-btn')?.cloneNode(true) as HTMLButtonElement;
     const settingsBtnClone = document.getElementById('settings-btn')?.cloneNode(true) as HTMLButtonElement;
     const themeToggleBtnClone = dom.themeToggleBtn.cloneNode(true) as HTMLButtonElement;
-    const saveBtnClone = document.getElementById('force-save-btn')?.cloneNode(true) as HTMLButtonElement;
     
+    // **MELHORIA DE ROBUSTEZ**: Usa o operador de optional chaining (?.) para
+    // adicionar listeners apenas se o botão clonado realmente existir. Isso evita
+    // erros de tempo de execução caso o elemento original não seja encontrado.
     settingsBtnClone?.addEventListener('click', () => document.getElementById('settings-btn')?.click());
     searchBtnClone?.addEventListener('click', () => document.getElementById('search-btn')?.click());
     themeToggleBtnClone.addEventListener('click', () => dom.themeToggleBtn.click());
-    saveBtnClone?.addEventListener('click', () => document.getElementById('force-save-btn')?.click());
 
-    iconButtonsContainer.append(searchBtnClone, settingsBtnClone, themeToggleBtnClone, saveBtnClone);
+    iconButtonsContainer.append(searchBtnClone, settingsBtnClone, themeToggleBtnClone);
     mobileMenuContainer.appendChild(iconButtonsContainer);
 };
 

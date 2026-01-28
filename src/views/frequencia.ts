@@ -43,15 +43,12 @@ function calculateMonthlyFinancials(monthYear: string) {
     const aulasDoMes = state.aulas.filter(a => a.chamadaRealizada && !a.isNoClassEvent && a.date.startsWith(monthYear));
     
     const distinctStudents = new Set<number>();
-    // Mapa auxiliar para garantir que temos o nome do aluno mesmo se ele não estiver mais na sala original (caso de transferência)
-    const studentInfoMap = new Map<number, { name: string, sala: string }>();
     
     // CORREÇÃO CRÍTICA: Lógica de Elegibilidade
     effectivelyActiveSalas.forEach(s => s.alunos.forEach(a => {
         // Cenário 1: O aluno tem um status "bom" hoje.
         if (activeStudentStatuses.includes(a.statusMatricula)) {
             distinctStudents.add(a.id);
-            studentInfoMap.set(a.id, { name: a.nomeCompleto, sala: s.nome });
         } 
         // Cenário 2: O aluno foi Excluído/Desistente HOJE, mas ESTAVA LÁ no mês do cálculo.
         // Verificamos se ele teve pelo menos 1 presença em qualquer aula do mês.
@@ -59,7 +56,6 @@ function calculateMonthlyFinancials(monthYear: string) {
             const tevePresencaNoMes = aulasDoMes.some(aula => aula.turma === s.nome && aula.presentes.includes(a.id));
             if (tevePresencaNoMes) {
                 distinctStudents.add(a.id);
-                studentInfoMap.set(a.id, { name: a.nomeCompleto, sala: s.nome });
             }
         }
     }));
@@ -80,32 +76,19 @@ function calculateMonthlyFinancials(monthYear: string) {
     distinctStudents.forEach(studentId => {
         let isFrequent = false;
         let maxFreq = 0;
-        
-        // Recupera informações básicas do mapa (fallback caso o aluno tenha sido transferido e não esteja na sala iterada)
-        let studentName = studentInfoMap.get(studentId)?.name || '';
-        let salaName = studentInfoMap.get(studentId)?.sala || '';
+        let studentName = '';
+        let salaName = '';
         
         // Variáveis temporárias para guardar o status do "livro" com melhor desempenho (ou que botou no radar)
         let currentBestStats = { missing: 0, present: 0, total: 0 };
 
         for (const sala of effectivelyActiveSalas) {
-            // Tenta encontrar o aluno na sala atual
             const alunoRef = sala.alunos.find(a => a.id === studentId);
-            
-            // Busca aulas desta sala neste mês
+            if (!alunoRef) continue;
+            studentName = alunoRef.nomeCompleto;
+            salaName = sala.nome;
+
             const aulasDaSalaNoMes = aulasDoMes.filter(a => a.turma === sala.nome);
-
-            // CORREÇÃO DE TRANSFERÊNCIA:
-            // Se o aluno não está na lista da sala E não tem aulas nessa sala no mês, pula.
-            // Mas se ele NÃO está na lista (foi transferido), mas TEM aulas (era dessa turma no mês passado), PROCESSA.
-            if (!alunoRef && aulasDaSalaNoMes.length === 0) continue;
-
-            // Se encontrou o aluno na lista atual, atualiza o nome/sala para o mais recente
-            if (alunoRef) {
-                studentName = alunoRef.nomeCompleto;
-                salaName = sala.nome;
-            }
-
             if (aulasDaSalaNoMes.length === 0) continue;
 
             const aulasPorLivro: Record<string, Aula[]> = {};
@@ -217,9 +200,6 @@ function generateEvolutionChart(currentMonth: string): string {
     const height = 280; // Aumentado um pouco para caber melhor no card
     const padding = 40;
     const maxVal = Math.max(...monthsData.map(d => d.value), 100) * 1.1; 
-    
-    // Fonte padrão do sistema para evitar distorção
-    const chartFont = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
     const points = monthsData.map((d, i) => {
         const x = padding + (i / (monthsData.length - 1)) * (width - 2 * padding);
@@ -242,15 +222,14 @@ function generateEvolutionChart(currentMonth: string): string {
         return `
             ${horistaHalo}
             <circle cx="${x}" cy="${y}" r="${dotRadius}" fill="var(--bg-color)" stroke="${dotStroke}" stroke-width="2" />
-            <text x="${x}" y="${y - 15}" text-anchor="middle" fill="var(--text-color)" font-family="${chartFont}" font-size="13" font-weight="bold">R$${Math.round(d.value)}</text>
-            <text x="${x}" y="${y - 4}" text-anchor="middle" fill="var(--text-secondary)" font-family="${chartFont}" font-size="10">${d.students} alunos</text>
-            <text x="${x}" y="${height - 15}" text-anchor="middle" fill="var(--text-secondary)" font-family="${chartFont}" font-size="12" font-weight="500" style="text-transform: uppercase;">${d.label}</text>
+            <text x="${x}" y="${y - 15}" text-anchor="middle" fill="var(--text-color)" font-size="13" font-weight="bold">R$${Math.round(d.value)}</text>
+            <text x="${x}" y="${y - 4}" text-anchor="middle" fill="var(--text-secondary)" font-size="10">${d.students} alunos</text>
+            <text x="${x}" y="${height - 15}" text-anchor="middle" fill="var(--text-secondary)" font-size="12" font-weight="500" style="text-transform: uppercase;">${d.label}</text>
         `;
     }).join('');
 
-    // Ajustado preserveAspectRatio para "xMidYMid meet" para evitar letras esticadas
     return `
-        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="overflow: visible;">
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow: visible;">
             <defs>
                 <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stop-color="var(--primary-blue)" stop-opacity="0.3"/>

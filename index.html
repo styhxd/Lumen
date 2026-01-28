@@ -5,27 +5,50 @@
   LÚMEN - ARQUIVO DE ENTRADA HTML PRINCIPAL (index.html)
   Copyright (c) 2025 Paulo Gabriel de L. S.
   Todos os direitos reservados.
+  
+  Este é o esqueleto da aplicação Lumen. Ele define a estrutura fundamental
+  da página, incluindo metadados, a área de renderização principal e os
+  contêineres para todos os modais da aplicação. A lógica e o conteúdo
+  dinâmico são injetados via JavaScript (index.tsx).
   ================================================================================
 -->
 <html lang="pt-BR" data-theme="dark">
 <head>
+    <!-- 
+      CONFIGURAÇÕES GLOBAIS DO DOCUMENTO
+      A seção <head> é crucial para o correto funcionamento e SEO da página.
+      Aqui definimos o conjunto de caracteres, a viewport para responsividade,
+      o título da página e a folha de estilos principal.
+    -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lumen: Painel de Gestão</title>
+    <!-- 
+      Copyright (c) 2025 Paulo Gabriel de L. S.
+    -->
+    <!-- A folha de estilos 'index.css' contém toda a identidade visual do Lumen,
+         incluindo o sistema de temas (dark/light) e a responsividade. -->
     <link rel="stylesheet" href="index.css">
+    <!-- Folha de estilos dedicada APENAS à impressão, garantindo fidelidade visual. -->
     <link rel="stylesheet" href="print.css" media="print">
 <script type="importmap">
 {
   "imports": {
     "vite": "https://esm.sh/vite@^7.3.1",
     "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.93.2"
+    "url": "https://esm.sh/url@^0.11.4"
   }
 }
 </script>
 </head>
 <body>
+    <!-- 
+      FUNDO ANIMADO
+      Este elemento cria um fundo dinâmico e visualmente agradável com formas
+      geométricas flutuantes, melhorando a estética da aplicação sem
+      interferir na funcionalidade. É posicionado de forma fixa e com z-index
+      negativo para ficar atrás de todo o conteúdo.
+    -->
     <div class="animated-bg">
         <div class="triangle"></div>
         <div class="triangle"></div>
@@ -33,33 +56,27 @@
         <div class="triangle"></div>
     </div>
 
-    <!-- TELA DE AUTENTICAÇÃO -->
-    <div id="auth-view" class="auth-container">
-        <!-- Injetado via JS -->
-    </div>
-
-    <!-- CONTÊINER PRINCIPAL -->
-    <div class="main-container" style="display: none;">
+    <!-- 
+      CONTÊINER PRINCIPAL
+      Engloba todo o conteúdo visível da aplicação, garantindo um layout
+      centralizado e com espaçamento consistente em diferentes tamanhos de tela.
+    -->
+    <div class="main-container">
+        <!-- 
+          CABEÇALHO DA APLICAÇÃO
+          Contém a navegação principal, a marca "Lumen", e os botões de ação
+          globais como pesquisa e configurações. Possui uma estrutura em grid
+          para desktop e uma navegação mobile separada para telas menores.
+        -->
         <header class="main-header">
-            <!-- Navegação Desktop -->
+            <!-- Navegação para Desktop -->
             <div class="desktop-header-grid">
                 <div class="header-brand-section">
                     <button id="lumen-brand-btn" data-view="dashboard" class="btn btn-large lumen-brand">
-                        <span class="btn-text">Lumen <span style="font-size: 0.5em; opacity: 0.5; vertical-align: text-top; font-weight: 400;">v2.24</span></span>
+                        <span class="btn-text">Lumen <span style="font-size: 0.5em; opacity: 0.5; vertical-align: text-top; font-weight: 400;">v2.23</span></span>
                     </button>
                     <span id="school-name">Microcamp Mogi das Cruzes</span>
                 </div>
-                
-                <!-- Status de Salvamento e Usuário -->
-                <div class="header-user-status" style="display: flex; align-items: center; gap: 1rem; margin-left: 1rem;">
-                    <div id="save-status" style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; min-width: 100px;">
-                        <!-- Injetado via JS -->
-                    </div>
-                    <button id="force-save-btn" class="btn btn-icon" style="padding: 0.3rem; height: auto;" title="Salvar Agora Manualmente">
-                        <svg class="btn-icon-svg" style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                    </button>
-                </div>
-
                 <div class="header-left-middle">
                     <div class="btn-row"><button id="alunos-btn" data-view="alunos" class="btn btn-medium"><span class="btn-text">Gerenciamento de Alunos</span></button><button id="notas-btn" data-view="notas" class="btn btn-medium"><span class="btn-text">Notas e Avaliações</span></button></div>
                     <div class="btn-row"><button id="aulas-extras-btn" data-view="aulasExtras" class="btn btn-medium"><span class="btn-text">Aulas Extras</span></button><button id="provas-btn" data-view="provas" class="btn btn-medium"><span class="btn-text">Provas e Tarefas</span></button></div>
@@ -73,10 +90,6 @@
                 </div>
                 <div class="header-right">
                     <div class="top-icon-buttons">
-                        <div id="user-info-display" style="font-size: 0.8rem; color: var(--primary-blue); font-weight: 500; margin-right: 0.5rem; display: none;"></div>
-                        <button id="logout-btn" class="btn btn-icon" aria-label="Sair" title="Sair">
-                            <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                        </button>
                         <button id="search-btn" class="btn btn-icon" aria-label="Pesquisar">
                             <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"></path></svg>
                         </button>
@@ -89,8 +102,9 @@
                 </div>
             </div>
 
+            <!-- Navegação para Dispositivos Móveis (ativada via CSS media queries) -->
             <nav class="mobile-nav">
-                <button class="mobile-header-title" data-view="dashboard">Lumen <span style="font-size: 0.5em; opacity: 0.5; vertical-align: text-top; font-weight: 400;">v2.24</span></button>
+                <button class="mobile-header-title" data-view="dashboard">Lumen <span style="font-size: 0.5em; opacity: 0.5; vertical-align: text-top; font-weight: 400;">v2.23</span></button>
                 <div class="hamburger-menu">
                     <div class="bar bar1"></div>
                     <div class="bar bar2"></div>
@@ -101,17 +115,28 @@
             </nav>
         </header>
         
+        <!-- 
+          CONTEÚDO PRINCIPAL (VIEWS)
+          Esta seção <main> serve como um contêiner para as diferentes "telas"
+          (views) da aplicação. Apenas uma view é visível por vez, e a troca
+          entre elas é controlada pelo JavaScript, que adiciona/remove a classe 'visible'.
+        -->
         <main>
-            <!-- Views (mantidas iguais, apenas colapsadas para brevidade na diff) -->
+            <!-- Cada div .content-view representa uma tela diferente da aplicação. -->
             <div id="dashboard-content" class="content-view">
                 <h1 class="view-title">Bem-vindo ao Lumen</h1>
                 <p>Selecione uma opção no menu acima para começar.</p>
             </div>
-            <div id="alunos-content" class="content-view"></div>
-            <div id="alunos-excluidos-content" class="content-view"></div>
-            <div id="notas-content" class="content-view"></div>
-            <div id="salas-finalizadas-content" class="content-view"></div>
-            <div id="aulas-extras-content" class="content-view"></div>
+            <div id="alunos-content" class="content-view">
+            </div>
+            <div id="alunos-excluidos-content" class="content-view">
+            </div>
+            <div id="notas-content" class="content-view">
+            </div>
+            <div id="salas-finalizadas-content" class="content-view">
+            </div>
+            <div id="aulas-extras-content" class="content-view">
+            </div>
             <div id="avisos-content" class="content-view">
                 <div class="view-header">
                     <h1 class="view-title">Quadro de Avisos e Reuniões</h1>
@@ -120,7 +145,8 @@
                         <span class="btn-text">Adicionar Aviso</span>
                     </button>
                 </div>
-                <div id="avisos-list-container" class="avisos-list"></div>
+                <div id="avisos-list-container" class="avisos-list">
+                </div>
             </div>
             <div id="recursos-content" class="content-view">
                 <div class="view-header">
@@ -131,13 +157,48 @@
                     </button>
                 </div>
                 <div class="view-filters">
-                    <div class="filter-group"><label for="filter-assunto">Filtrar por Assunto</label><input type="text" id="filter-assunto" class="filter-input" placeholder="Ex: To Be Verb"></div>
-                     <div class="filter-group"><label for="filter-livro">Filtrar por Livro</label><input type="text" id="filter-livro" class="filter-input" placeholder="Ex: Book 1"></div>
-                    <div class="filter-group"><label for="filter-tipo">Filtrar por Tipo</label><select id="filter-tipo" class="filter-input"><option value="">Todos os Tipos</option><option value="Exercício Impresso">Exercício Impresso</option><option value="Kahoot">Kahoot</option><option value="Google Slides">Google Slides</option><option value="Vídeo">Vídeo</option><option value="Outros">Outros</option></select></div>
+                    <div class="filter-group">
+                        <label for="filter-assunto">Filtrar por Assunto</label>
+                        <input type="text" id="filter-assunto" class="filter-input" placeholder="Ex: To Be Verb">
+                    </div>
+                     <div class="filter-group">
+                        <label for="filter-livro">Filtrar por Livro</label>
+                        <input type="text" id="filter-livro" class="filter-input" placeholder="Ex: Book 1">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-tipo">Filtrar por Tipo</label>
+                        <select id="filter-tipo" class="filter-input">
+                            <option value="">Todos os Tipos</option>
+                            <option value="Exercício Impresso">Exercício Impresso</option>
+                            <option value="Kahoot">Kahoot</option>
+                            <option value="Google Slides">Google Slides</option>
+                            <option value="Vídeo">Vídeo</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="table-container"><table class="data-table" id="recursos-table"><thead><tr><th data-sort="livro">Nome do Livro</th><th data-sort="pagina">Página</th><th data-sort="tipo">Tipo do Material</th><th data-sort="assunto">Assunto</th><th data-sort="link">Link</th><th>Ações</th></tr></thead><tbody id="recursos-tbody"></tbody></table></div>
-                <div id="recursos-cards-container" class="cards-container"></div>
-                 <div id="recursos-empty-state" class="empty-state" style="display: none;"><p>Nenhum material didático encontrado.</p><p>Clique em "Adicionar Material" para criar o primeiro.</p></div>
+                <div class="table-container">
+                    <table class="data-table" id="recursos-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="livro">Nome do Livro</th>
+                                <th data-sort="pagina">Página</th>
+                                <th data-sort="tipo">Tipo do Material</th>
+                                <th data-sort="assunto">Assunto</th>
+                                <th data-sort="link">Link</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recursos-tbody">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="recursos-cards-container" class="cards-container">
+                </div>
+                 <div id="recursos-empty-state" class="empty-state" style="display: none;">
+                    <p>Nenhum material didático encontrado.</p>
+                    <p>Clique em "Adicionar Material" para criar o primeiro.</p>
+                </div>
             </div>
             <div id="provas-content" class="content-view">
                 <div class="view-header">
@@ -147,16 +208,51 @@
                         <span class="btn-text">Adicionar Prova</span>
                     </button>
                 </div>
-                <div class="btn-row" id="provas-category-nav" style="margin-bottom: 1.5rem; justify-content: flex-start;"><button class="btn active" data-category="new"><span class="btn-text">New Books</span></button><button class="btn" data-category="old"><span class="btn-text">Old Books</span></button></div>
-                <div class="view-filters">
-                    <div class="filter-group"><label for="filter-prova-livro">Filtrar por Livro</label><input type="text" id="filter-prova-livro" class="filter-input" placeholder="Ex: Book 1"></div>
-                     <div class="filter-group"><label for="filter-prova-temas">Filtrar por Tema</label><input type="text" id="filter-prova-temas" class="filter-input" placeholder="Ex: Plural"></div>
-                    <div class="filter-group"><label for="filter-prova-tipo">Filtrar por Tipo</label><select id="filter-prova-tipo" class="filter-input"><option value="">Todos os Tipos</option><option value="Prova Normal">Prova Normal</option><option value="Prova Conjunta">Prova Conjunta</option><option value="Outros">Outros</option></select></div>
+                <div class="btn-row" id="provas-category-nav" style="margin-bottom: 1.5rem; justify-content: flex-start;">
+                    <button class="btn active" data-category="new"><span class="btn-text">New Books</span></button>
+                    <button class="btn" data-category="old"><span class="btn-text">Old Books</span></button>
                 </div>
-                <div class="table-container"><table class="data-table" id="provas-table"><thead><tr><th data-sort="livro">Nome do Livro</th><th data-sort="tipo">Tipo</th><th data-sort="temas">Temas Aplicados</th><th data-sort="linkEscrita">Prova Escrita</th><th data-sort="linkOral">Prova Oral</th><th>Ações</th></tr></thead><tbody id="provas-tbody"></tbody></table></div>
+                <div class="view-filters">
+                    <div class="filter-group">
+                        <label for="filter-prova-livro">Filtrar por Livro</label>
+                        <input type="text" id="filter-prova-livro" class="filter-input" placeholder="Ex: Book 1">
+                    </div>
+                     <div class="filter-group">
+                        <label for="filter-prova-temas">Filtrar por Tema</label>
+                        <input type="text" id="filter-prova-temas" class="filter-input" placeholder="Ex: Plural">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-prova-tipo">Filtrar por Tipo</label>
+                        <select id="filter-prova-tipo" class="filter-input">
+                           <option value="">Todos os Tipos</option>
+                           <option value="Prova Normal">Prova Normal</option>
+                           <option value="Prova Conjunta">Prova Conjunta</option>
+                           <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table" id="provas-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="livro">Nome do Livro</th>
+                                <th data-sort="tipo">Tipo</th>
+                                <th data-sort="temas">Temas Aplicados</th>
+                                <th data-sort="linkEscrita">Prova Escrita</th>
+                                <th data-sort="linkOral">Prova Oral</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="provas-tbody"></tbody>
+                    </table>
+                </div>
                 <div id="provas-cards-container" class="cards-container"></div>
-                 <div id="provas-empty-state" class="empty-state" style="display: none;"><p>Nenhuma prova encontrada para esta categoria.</p><p>Clique em "Adicionar Prova" para criar a primeira.</p></div>
+                 <div id="provas-empty-state" class="empty-state" style="display: none;">
+                    <p>Nenhuma prova encontrada para esta categoria.</p>
+                    <p>Clique em "Adicionar Prova" para criar a primeira.</p>
+                </div>
             </div>
+            
             <div id="aula-dia-content" class="content-view">
                 <div class="view-header">
                     <h1 id="aula-dia-view-title" class="view-title">Aula do Dia</h1>
@@ -179,9 +275,14 @@
                         </button>
                     </div>
                 </div>
-                <div id="aula-dia-list-container" class="aula-dia-list-container"></div>
-                <div id="aulas-empty-state" class="empty-state" style="display: none;"><p>Nenhuma aula planejada para este mês.</p><p>Clique em "Planejar Aula" para começar.</p></div>
+                <div id="aula-dia-list-container" class="aula-dia-list-container">
+                </div>
+                <div id="aulas-empty-state" class="empty-state" style="display: none;">
+                    <p>Nenhuma aula planejada para este mês.</p>
+                    <p>Clique em "Planejar Aula" para começar.</p>
+                </div>
             </div>
+
             <div id="aulas-arquivadas-content" class="content-view">
                 <div class="view-header">
                      <button id="voltar-calendario-btn" data-view="aulaDia" class="btn btn-large">
@@ -193,42 +294,63 @@
                  <div class="view-filters">
                     <div class="filter-group" style="flex-grow: 2;">
                         <label for="archive-month-select">Selecionar Mês</label>
-                        <select id="archive-month-select" class="filter-input"></select>
+                        <select id="archive-month-select" class="filter-input">
+                        </select>
                     </div>
                 </div>
-                <div id="aulas-arquivadas-list-container" class="aula-dia-list-container"></div>
-                <div id="aulas-arquivadas-empty-state" class="empty-state" style="display: none;"><p>Nenhuma aula encontrada para o mês selecionado.</p></div>
+                <div id="aulas-arquivadas-list-container" class="aula-dia-list-container">
+                </div>
+                <div id="aulas-arquivadas-empty-state" class="empty-state" style="display: none;">
+                    <p>Nenhuma aula encontrada para o mês selecionado.</p>
+                </div>
             </div>
+            
             <div id="frequencia-content" class="content-view">
                 <div class="view-header">
                     <h1 class="view-title">Registro de Frequência</h1>
-                    <div class="btn-row"><button id="frequencia-toggle-visibility-btn" class="btn btn-icon" aria-label="Mostrar/Ocultar Valores"></button></div>
+                    <div class="btn-row">
+                        <button id="frequencia-toggle-visibility-btn" class="btn btn-icon" aria-label="Mostrar/Ocultar Valores">
+                        </button>
+                    </div>
                 </div>
-                <div id="frequencia-content-body" class="frequencia-grid"></div>
+                <div id="frequencia-content-body" class="frequencia-grid">
+                </div>
             </div>
-            <div id="calendario-content" class="content-view"></div>
-            <div id="relatorios-content" class="content-view"></div>
+
+            <div id="calendario-content" class="content-view">
+            </div>
+
+            <div id="relatorios-content" class="content-view">
+            </div>
         </main>
         
-        <div class="bottom-action-bar" style="flex-wrap: wrap;">
+        <!-- 
+          BARRA DE AÇÕES INFERIOR
+          Oferece acesso rápido a funcionalidades globais de importação e
+          exportação de dados, permanecendo em uma posição de destaque no
+          final da área de conteúdo.
+        -->
+        <div class="bottom-action-bar">
              <button id="import-btn" class="btn btn-large">
                 <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span class="btn-text">Importar JSON (Backup)</span>
+                <span class="btn-text">Importar JSON</span>
                 <div class="spinner"></div>
              </button>
              <button id="export-btn" class="btn btn-large">
                 <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                <span class="btn-text">Exportar JSON (Backup)</span>
-             </button>
-             <button id="diagnostic-btn" class="btn btn-large" style="background-color: #334155;">
-                <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                <span class="btn-text">🛠 Testar Conexão</span>
+                <span class="btn-text">Exportar JSON</span>
              </button>
         </div>
     </div>
     
-    <!-- Resto dos modais (mantidos iguais) -->
+    <!-- Input oculto para acionar a seleção de arquivo para importação. -->
     <input type="file" id="import-file-input" accept=".json" style="display: none;">
+
+    <!-- 
+      SOBREPOSIÇÃO DE ARRASTAR E SOLTAR (DRAG & DROP)
+      Uma interface visual que aparece quando o usuário arrasta um arquivo sobre
+      a janela do navegador, facilitando a importação de dados.
+    -->
     <div id="drag-drop-overlay">
         <div class="drag-drop-content">
             <svg class="drag-drop-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
@@ -237,49 +359,882 @@
         </div>
     </div>
 
-    <!-- Modais -->
+
+    <!-- 
+      ================================================================================
+      SEÇÃO DE MODAIS
+      
+      Todos os modais da aplicação são pré-definidos no HTML, mas permanecem
+      ocultos por padrão. O JavaScript controla sua visibilidade, preenche
+      seus formulários com os dados necessários e gerencia suas interações.
+      Esta abordagem melhora a performance ao evitar a criação e destruição
+      constante de elementos no DOM.
+      
+      Abaixo está um exemplo de um modal. Todos os outros seguem uma estrutura similar:
+      - .modal-backdrop: O fundo semi-transparente que cobre a tela.
+      - .modal-content: O contêiner do conteúdo do modal.
+      - <form>: O formulário para entrada de dados.
+      - .modal-actions: A área com os botões de confirmação e cancelamento.
+      ================================================================================
+    -->
     <div id="aviso-modal" class="modal-backdrop">
         <div class="modal-content">
             <h2 id="modal-title" class="view-title">Adicionar Novo Aviso</h2>
             <form id="aviso-form">
                 <input type="hidden" id="aviso-id">
-                <div class="form-group"><label for="aviso-date">Data</label><input type="date" id="aviso-date" required></div>
-                <div class="form-group"><label for="aviso-notes">Título Curto</label><input type="text" id="aviso-notes" placeholder="Ex: Reunião Geral - 13h" required></div>
-                <div class="form-group"><label for="aviso-details">Detalhes</label><textarea id="aviso-details" placeholder="Descreva aqui os detalhes completos do aviso ou da pauta da reunião..." required></textarea></div>
-                <div class="modal-actions"><button type="button" id="cancel-btn" class="btn">Cancelar</button><button type="submit" id="save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div>
+                <div class="form-group">
+                    <label for="aviso-date">Data</label>
+                    <input type="date" id="aviso-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="aviso-notes">Título Curto</label>
+                    <input type="text" id="aviso-notes" placeholder="Ex: Reunião Geral - 13h" required>
+                </div>
+                <div class="form-group">
+                    <label for="aviso-details">Detalhes</label>
+                    <textarea id="aviso-details" placeholder="Descreva aqui os detalhes completos do aviso ou da pauta da reunião..." required></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
             </form>
         </div>
     </div>
-    <!-- Outros modais mantidos -->
-    <div id="recurso-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="recurso-modal-title" class="view-title">Adicionar Material</h2><form id="recurso-form"><input type="hidden" id="recurso-id"><div class="form-group"><label for="recurso-livro">Nome do Livro</label><input type="text" id="recurso-livro" placeholder="Ex: Book 1" required></div><div class="form-group"><label for="recurso-pagina">Página do Livro</label><input type="number" id="recurso-pagina" placeholder="Ex: 25" required></div><div class="form-group"><label for="recurso-tipo">Tipo do Material</label><select id="recurso-tipo" required><option value="Exercício Impresso">Exercício Impresso</option><option value="Kahoot">Kahoot</option><option value="Google Slides">Google Slides</option><option value="Vídeo">Vídeo</option><option value="Outros">Outros</option></select></div><div class="form-group"><label for="recurso-assunto">Assunto</label><input type="text" id="recurso-assunto" placeholder="Ex: To Be Verb" required></div><div class="form-group"><label for="recurso-link">Link do Material (opcional)</label><input type="url" id="recurso-link" placeholder="https://kahoot.it/..."></div><div class="modal-actions"><button type="button" id="recurso-cancel-btn" class="btn">Cancelar</button><button type="submit" id="recurso-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="prova-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="prova-modal-title" class="view-title">Adicionar Nova Prova</h2><form id="prova-form"><input type="hidden" id="prova-id"><div class="form-group"><label for="prova-category">Categoria do Livro</label><select id="prova-category" required><option value="new">New Book</option><option value="old">Old Book</option></select></div><div class="form-group"><label for="prova-livro">Nome do Livro</label><input type="text" id="prova-livro" placeholder="Ex: Book 3" required></div><div class="form-group"><label for="prova-tipo">Tipo da Prova</label><select id="prova-tipo" required><option value="Prova Normal">Prova Normal</option><option value="Prova Conjunta">Prova Conjunta</option><option value="Outros">Outros</option></select></div><div class="form-group"><label for="prova-temas">Temas Aplicados</label><textarea id="prova-temas" placeholder="Ex: Plural; Name; Family; Personality..." required></textarea></div><div class="form-group"><label for="prova-linkEscrita">Link da Prova Escrita (opcional)</label><input type="url" id="prova-linkEscrita" placeholder="https://forms.gle/..."></div><div class="form-group"><label for="prova-linkOral">Link da Prova Oral (opcional)</label><input type="url" id="prova-linkOral" placeholder="https://docs.google.com/document/..."></div><div class="modal-actions"><button type="button" id="prova-cancel-btn" class="btn">Cancelar</button><button type="submit" id="prova-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="ferias-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 400px; text-align: center;"><h2 class="view-title">Registrar Férias! 🎉</h2><p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Selecione o período para registrar férias no sistema.</p><form id="ferias-form"><div class="form-group"><label for="ferias-start-date">Início das Férias</label><input type="date" id="ferias-start-date" required></div><div class="form-group"><label for="ferias-end-date">Fim das Férias</label><input type="date" id="ferias-end-date" required></div><div class="modal-actions" style="justify-content: center;"><button type="button" id="ferias-cancel-btn" class="btn">Cancelar</button><button type="submit" id="ferias-save-btn" class="btn btn-primary"><span class="btn-text">Confirmar</span></button></div></form></div></div>
-    <div id="aula-dia-modal" class="modal-backdrop"><div class="modal-content"><h2 id="aula-dia-modal-title" class="view-title">Planejar Nova Aula</h2><form id="aula-dia-form"><input type="hidden" id="aula-dia-id"><div class="form-group"><label for="aula-dia-date">Data</label><input type="date" id="aula-dia-date" required></div><div class="form-group full-width" id="sem-aula-toggle-group"><label><input type="checkbox" id="aula-dia-sem-aula-check">Marcar este dia como "Sem Aula" (Feriado, Evento, etc.)</label></div><div id="sem-aula-details-group" class="form-grid" style="display: none;"><div class="form-group"><label for="sem-aula-tipo">Tipo de Evento</label><select id="sem-aula-tipo"><option value="Feriado">Feriado</option><option value="Evento">Evento Escolar</option><option value="Outros">Outros</option></select></div><div class="form-group" style="grid-column: 2 / -1;"><label for="sem-aula-descricao">Descrição</label><input type="text" id="sem-aula-descricao" placeholder="Ex: Feriado de Corpus Christi"></div></div><div id="aula-principal-form-grid"><div class="form-grid"><div class="form-group"><label for="aula-dia-turma">Turma</label><input type="text" id="aula-dia-turma" list="turmas-list" placeholder="Ex: SQ18h" autocomplete="off"><datalist id="turmas-list"></datalist></div><div class="form-group"><label for="aula-dia-linguagem">Idioma</label><select id="aula-dia-linguagem"><option value="PT">Português (PT)</option><option value="EN">Inglês (EN)</option></select></div><div class="form-group full-width"><label for="aula-dia-tema">Tema Principal da Aula</label><input type="text" id="aula-dia-tema" placeholder="Ex: Verb To Be Review"></div><div class="form-group full-width" style="border-top: 1px solid var(--border-color); padding-top: 1rem;"><label for="aula-dia-onde-parou">Onde Parou (Aula Anterior)</label><div class="form-grid" style="gap: 0.5rem 1rem;"><select id="aula-dia-livro-parou" style="grid-column: 1 / 2;"></select><textarea id="aula-dia-onde-parou" placeholder="Conteúdo da aula anterior..." style="grid-column: 2 / -1; min-height: 80px;"></textarea></div></div><div class="form-group full-width"><label for="aula-dia-hoje">Planejamento da Aula de Hoje (para Chamada)</label><div class="form-grid" style="gap: 0.5rem 1rem;"><select id="aula-dia-livro-hoje" style="grid-column: 1 / 2;" required></select><textarea id="aula-dia-hoje" placeholder="Descreva as atividades, páginas e exercícios..." style="grid-column: 2 / -1;"></textarea></div></div><div class="form-group full-width"><label for="aula-dia-seguinte">Conteúdo para a Próxima Aula (Opcional)</label><textarea id="aula-dia-seguinte" placeholder="Cole aqui o conteúdo que não deu tempo de aplicar..." style="min-height: 80px;"></textarea></div><div class="form-group full-width"><label for="aula-dia-anotacoes">Anotações (Opcional)</label><textarea id="aula-dia-anotacoes" placeholder="Observações sobre a turma, preparativos, etc." style="min-height: 80px;"></textarea></div></div></div><div class="modal-actions"><button type="button" id="aula-dia-cancel-btn" class="btn">Cancelar</button><button type="submit" id="aula-dia-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="freelance-aula-modal" class="modal-backdrop"><div class="modal-content"><h2 id="freelance-aula-modal-title" class="view-title">Registrar Aula Horista Avulsa</h2><form id="freelance-aula-form"><input type="hidden" id="freelance-aula-id"><div class="form-grid" style="grid-template-columns: 1fr 1fr;"><div class="form-group"><label for="freelance-aula-date">Data</label><input type="date" id="freelance-aula-date" required></div><div class="form-group"><label for="freelance-aula-duracao">Duração (horas)</label><input type="number" id="freelance-aula-duracao" min="0.5" step="0.5" value="1.5" required></div><div class="form-group"><label for="freelance-aula-turma">Turma / Referência</label><input type="text" id="freelance-aula-turma" placeholder="Ex: Reforço Maria" required></div><div class="form-group"><label for="freelance-aula-escola">Escola (Opcional)</label><input type="text" id="freelance-aula-escola" placeholder="Ex: Colégio XYZ"></div></div><div class="form-group"><label for="freelance-aula-conteudo">Conteúdo Aplicado</label><textarea id="freelance-aula-conteudo" placeholder="Descreva as atividades e tópicos abordados..." required></textarea></div><div class="form-group"><label for="freelance-aula-anotacoes">Anotações (Opcional)</label><textarea id="freelance-aula-anotacoes" placeholder="Observações sobre a aula, desempenho, etc." style="min-height: 80px;"></textarea></div><div class="modal-actions"><button type="button" id="freelance-aula-cancel-btn" class="btn">Cancelar</button><button type="submit" id="freelance-aula-save-btn" class="btn btn-primary"><span class="btn-text">Salvar Aula</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="calendario-modal" class="modal-backdrop"><div class="modal-content"><h2 id="calendario-modal-title" class="view-title">Adicionar Evento</h2><form id="calendario-form"><input type="hidden" id="calendario-evento-id"><div class="form-grid"><div class="form-group"><label for="calendario-evento-date">Data</label><input type="date" id="calendario-evento-date" required></div><div class="form-group"><label for="calendario-evento-tipo">Tipo</label><select id="calendario-evento-tipo" required><option value="evento">Evento Escolar</option><option value="feriado">Feriado</option><option value="sem-aula">Dia Sem Aula (Ponto Facultativo, etc)</option><option value="lembrete">Lembrete Pessoal</option></select></div><div class="form-group full-width"><label for="calendario-evento-title">Título</label><input type="text" id="calendario-evento-title" placeholder="Ex: Festa Junina" required></div><div class="form-group full-width"><label for="calendario-evento-description">Descrição (Opcional)</label><textarea id="calendario-evento-description" placeholder="Detalhes sobre o evento..."></textarea></div></div><div class="modal-actions"><button type="button" id="calendario-cancel-btn" class="btn">Cancelar</button><button type="submit" id="calendario-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="delete-confirm-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 500px;"><h2 class="view-title">Confirmar Exclusão</h2><p id="delete-confirm-message">Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.</p><div class="modal-actions"><button type="button" id="cancel-delete-btn" class="btn">Cancelar</button><button type="button" id="confirm-delete-btn" class="btn btn-primary" style="background-color: var(--error-color); border-color: transparent;"><span class="btn-text">Excluir</span><div class="spinner"></div></button></div></div></div>
-    <div id="import-confirm-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 500px;"><h2 class="view-title">Confirmar Importação</h2><p>Tem certeza de que deseja importar este arquivo? Todos os dados atuais (avisos, recursos, provas, aulas, nome da escola, etc.) serão substituídos. Esta ação não pode ser desfeita.</p><div class="modal-actions"><button type="button" id="cancel-import-btn" class="btn">Cancelar</button><button type="button" id="confirm-import-btn" class="btn btn-primary"><span class="btn-text">Importar</span><div class="spinner"></div></button></div></div></div>
-    <div id="sala-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="sala-modal-title" class="view-title">Adicionar Nova Sala</h2><form id="sala-form"><input type="hidden" id="sala-id"><div class="form-grid" style="grid-template-columns: 1fr 1fr;"><div class="form-group"><label for="sala-nome">Nome da Sala</label><input type="text" id="sala-nome" placeholder="Ex: SQA20h" required></div><div class="form-group"><label for="sala-tipo">Tipo de Turma</label><select id="sala-tipo" required><option value="Regular">Regular</option><option value="Horista">Horista</option></select></div><div class="form-group"><label for="sala-data-inicio">Data de Início</label><input type="date" id="sala-data-inicio" required></div><div class="form-group"><label for="sala-data-fim">Data Prevista de Fim</label><input type="date" id="sala-data-fim" required></div><div class="form-group full-width"><label>Dias da Semana</label><div id="sala-dias-semana" class="checkbox-group"></div></div></div><div id="sala-horista-fields" style="display: none; border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;"><h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Detalhes da Turma Horista</h4><div class="form-grid"><div class="form-group"><label for="sala-escola-horista">Nome da Escola</label><input type="text" id="sala-escola-horista" placeholder="Ex: Colégio ABC"></div><div class="form-group"><label for="sala-duracao-aula">Duração da Aula (horas)</label><input type="number" id="sala-duracao-aula" min="0.5" step="0.5" value="2"></div><div class="form-group full-width"><label for="sala-inicio-livro">Início do Livro</label><select id="sala-inicio-livro"><option value="inicio">Começa do Início</option><option value="meio">Começa do Meio do Livro</option></select></div></div></div><div class="modal-actions"><button type="button" id="sala-cancel-btn" class="btn">Cancelar</button><button type="submit" id="sala-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="finalizar-sala-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 500px;"><h2 id="finalizar-sala-modal-title" class="view-title">Finalizar Sala</h2><form id="finalizar-sala-form"><input type="hidden" id="finalizar-sala-id"><p id="finalizar-sala-message" style="margin-bottom: 1.5rem;">Selecione o motivo para finalizar e arquivar esta sala. Ela será movida para a lista de "Salas Finalizadas".</p><div class="form-group"><label for="finalizar-sala-motivo">Motivo da Finalização</label><select id="finalizar-sala-motivo" required><option value="Curso concluído">Curso concluído</option><option value="Troca de professor">Troca de professor</option><option value="Turma desfeita">Turma desfeita</option><option value="Outro">Outro</option></select></div><div class="form-group" id="finalizar-sala-detalhes-group" style="display: none;"><label for="finalizar-sala-detalhes">Detalhes</label><textarea id="finalizar-sala-detalhes" placeholder="Forneça mais detalhes sobre o motivo."></textarea></div><div class="modal-actions"><button type="button" id="finalizar-sala-cancel-btn" class="btn">Cancelar</button><button type="submit" id="finalizar-sala-confirm-btn" class="btn btn-primary"><span class="btn-text">Confirmar Finalização</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="livro-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="livro-modal-title" class="view-title">Adicionar Novo Livro</h2><form id="livro-form"><input type="hidden" id="livro-id"><input type="hidden" id="livro-parent-sala-id"><div class="form-grid"><div class="form-group full-width"><label for="livro-nome">Nome do Livro</label><input type="text" id="livro-nome" placeholder="Ex: Book 1" required></div><div class="form-group"><label for="livro-mes-inicio">Mês de Início</label><input type="month" id="livro-mes-inicio" required></div><div class="form-group"><label for="livro-mes-fim">Mês Previsto de Fim</label><input type="month" id="livro-mes-fim" required></div></div><div class="modal-actions"><button type="button" id="livro-cancel-btn" class="btn">Cancelar</button><button type="submit" id="livro-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="aluno-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="aluno-modal-title" class="view-title">Adicionar Novo Aluno</h2><form id="aluno-form"><input type="hidden" id="aluno-id"><input type="hidden" id="aluno-parent-sala-id"><input type="hidden" id="aluno-parent-livro-id"><div class="form-grid"><div class="form-group"><label for="aluno-ctr">CTR</label><input type="text" id="aluno-ctr" placeholder="Código do aluno" required></div><div class="form-group"><label for="aluno-nome">Nome Completo</label><input type="text" id="aluno-nome" placeholder="Nome do aluno" required></div><div class="form-group full-width"><label for="aluno-status">Status do Aluno</label><select id="aluno-status" required><option value="Ativo">Aluno Novo (Ativo)</option><option value="Nivelamento">Nivelamento</option><option value="Transferido (interno)">Transferido (de outra turma)</option><option value="Transferido (externo)">Transferido (para outra unidade)</option><option value="Desistente">Desistente / Não Frequente</option><option value="Concluído">Concluiu o curso</option><option value="Excluído">Excluído</option></select></div><div class="form-group full-width" id="aluno-livro-inicio-group" style="display: none;"><label for="aluno-livro-inicio">Livro de Início</label><select id="aluno-livro-inicio"></select></div><div class="form-group full-width" id="aluno-origem-group" style="display: none;"><label for="aluno-origem">Origem da Transferência</label><input type="text" id="aluno-origem" placeholder="Ex: SQA19h"></div></div><div id="aluno-historico-group" class="full-width" style="display: none; border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;"><h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Dados de Progresso Anterior</h4><div class="form-grid"><div class="form-group"><label for="aluno-historico-presencas">Aulas que Assistiu (Presenças)</label><input type="number" id="aluno-historico-presencas" placeholder="Ex: 5" min="0"></div><div class="form-group"><label for="aluno-historico-aulas-dadas">Total de Aulas Dadas (no Livro)</label><input type="number" id="aluno-historico-aulas-dadas" placeholder="Ex: 8" min="0"></div></div><div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;"><div class="form-group"><label for="aluno-historico-written">Nota Written</label><input type="text" inputmode="decimal" id="aluno-historico-written" placeholder="Ex: 8,5"></div><div class="form-group"><label for="aluno-historico-oral">Nota Oral</label><input type="text" inputmode="decimal" id="aluno-historico-oral" placeholder="Ex: 9,0"></div><div class="form-group"><label for="aluno-historico-participation">Nota Participation</label><input type="text" inputmode="decimal" id="aluno-historico-participation" placeholder="Ex: 10,0"></div></div></div><div class="modal-actions"><button type="button" id="aluno-cancel-btn" class="btn">Cancelar</button><button type="submit" id="aluno-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="transfer-aluno-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="transfer-aluno-modal-title" class="view-title">Transferir Aluno</h2><form id="transfer-aluno-form"><input type="hidden" id="transfer-source-sala-id"><input type="hidden" id="transfer-source-livro-id"><div class="form-group"><label for="transfer-aluno-select">Aluno a ser Transferido</label><select id="transfer-aluno-select" required></select></div><div class="form-grid"><div class="form-group"><label for="transfer-dest-sala-select">Sala de Destino</label><select id="transfer-dest-sala-select" required></select></div><div class="form-group"><label for="transfer-dest-livro-select">Livro de Destino</label><select id="transfer-dest-livro-select" required></select></div></div><div id="transfer-grades-group" class="form-group" style="display: none;"><label class="checkbox-group" style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 400;"><input type="checkbox" id="transfer-grades-check" style="width: auto;"><span>Manter notas (apenas se o livro for o mesmo. Ex: Book 2 para Book 2)</span></label></div><div id="transfer-frequency-group" style="border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;"><h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Configuração de Frequência Inicial</h4><p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">Defina a base de frequência do aluno no novo livro. As chamadas futuras serão somadas a estes valores.</p><div class="form-grid"><div class="form-group"><label for="transfer-historico-aulas-dadas">Aulas Dadas no Novo Livro</label><input type="number" id="transfer-historico-aulas-dadas" min="0" value="0" class="form-control"></div><div class="form-group"><label for="transfer-historico-presencas">Presenças Iniciais</label><input type="number" id="transfer-historico-presencas" min="0" value="0" class="form-control"></div></div><button type="button" id="transfer-set-100-freq" class="btn" style="width: 100%; margin-top: 0.5rem;"><span class="btn-text">Dar 100% de Frequência (Baseado nas aulas já dadas na sala de destino)</span></button></div><div class="modal-actions"><button type="button" id="transfer-aluno-cancel-btn" class="btn">Cancelar</button><button type="submit" id="transfer-aluno-save-btn" class="btn btn-primary"><span class="btn-text">Confirmar Transferência</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="aluno-particular-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 id="aluno-particular-modal-title" class="view-title">Adicionar Aluno Particular</h2><form id="aluno-particular-modal-form"><input type="hidden" id="aluno-particular-modal-id-input"><p style="color: var(--text-secondary); margin-bottom: 1rem;">Você pode cadastrar um nome novo ou vincular a um aluno já existente no sistema para evitar duplicidade.</p><div class="form-group"><label for="aluno-particular-modal-nome">Nome do Aluno</label><input type="text" id="aluno-particular-modal-nome" placeholder="Digite o nome do aluno" required></div><div class="form-group"><label for="aluno-particular-modal-link">Vincular a Aluno Existente (Opcional)</label><input type="text" id="aluno-particular-modal-link" list="alunos-matriculados-list" placeholder="Comece a digitar para buscar..." autocomplete="off"><datalist id="alunos-matriculados-list"></datalist></div><div class="modal-actions"><button type="button" id="aluno-particular-modal-cancel-btn" class="btn">Cancelar</button><button type="submit" id="aluno-particular-modal-save-btn" class="btn btn-primary"><span class="btn-text">Salvar</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="aula-particular-lesson-modal" class="modal-backdrop"><div class="modal-content"><h2 id="aula-particular-lesson-modal-title" class="view-title">Registrar Nova Aula</h2><form id="aula-particular-lesson-form"><input type="hidden" id="aula-particular-lesson-aluno-id"><input type="hidden" id="aula-particular-lesson-id"><div class="form-grid" style="grid-template-columns: 1fr 1fr 2fr;"><div class="form-group"><label for="aula-particular-lesson-modal-data">Data</label><input type="date" id="aula-particular-lesson-modal-data" required></div><div class="form-group"><label for="aula-particular-lesson-modal-livro">Livro (Opcional)</label><input type="text" id="aula-particular-lesson-modal-livro" placeholder="Ex: Book 1"></div><div class="form-group" style="grid-column: 3 / -1;"><label for="aula-particular-lesson-modal-temas">Temas da Aula</label><input type="text" id="aula-particular-lesson-modal-temas" placeholder="Ex: Verb to Be, Simple Present" required></div><div class="form-group full-width"><label for="aula-particular-lesson-modal-sobras">Conteúdo para a Próxima Aula (Opcional)</label><textarea id="aula-particular-lesson-modal-sobras" style="min-height: 80px;" placeholder="O que não deu tempo de aplicar..."></textarea></div><div class="form-group full-width"><label for="aula-particular-lesson-modal-observacoes">Observações (Opcional)</label><textarea id="aula-particular-lesson-modal-observacoes" style="min-height: 80px;" placeholder="Notas sobre o desempenho do aluno, etc..."></textarea></div></div><div class="modal-actions"><button type="button" id="aula-particular-lesson-modal-cancel-btn" class="btn">Cancelar</button><button type="submit" class="btn btn-primary"><span class="btn-text">Salvar Aula</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="chamada-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 800px;"><h2 id="chamada-modal-title" class="view-title">Realizar Chamada</h2><form id="chamada-form"><input type="hidden" id="chamada-aula-id"><p style="margin-bottom: 1rem; color: var(--text-secondary);">Marque os alunos presentes na aula.</p><div id="chamada-alunos-list"></div><div class="modal-actions"><button type="button" id="chamada-cancel-btn" class="btn">Cancelar</button><button type="submit" id="chamada-save-btn" class="btn btn-primary"><span class="btn-text">Salvar Chamada</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="settings-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 600px;"><h2 class="view-title">Configurações Gerais</h2><form id="settings-form"><div class="form-grid"><div class="form-group"><label for="setting-teacher-name">Nome do Professor</label><input type="text" id="setting-teacher-name" required></div><div class="form-group"><label for="setting-school-name">Nome da Escola</label><input type="text" id="setting-school-name" required></div><div class="form-group full-width"><label for="setting-school-logo">URL do Logo da Escola (PNG/JPG)</label><input type="url" id="setting-school-logo" placeholder="https://exemplo.com/logo.png"><small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">A imagem será ajustada automaticamente para o cabeçalho do boletim.</small></div></div><h3 style="font-size: 1.25rem; font-weight: 600; color: var(--primary-blue); margin: 1.5rem 0 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">Configurações de Bônus</h3><div class="form-grid"><div class="form-group"><label for="setting-bonus-value">Valor do Bônus por Aluno (R$)</label><input type="number" id="setting-bonus-value" step="0.01" min="0" required></div><div class="form-group"><label for="setting-min-alunos">Mínimo de Alunos Frequentes para Bônus</label><input type="number" id="setting-min-alunos" step="1" min="0" required></div></div><h3 style="font-size: 1.25rem; font-weight: 600; color: var(--primary-blue); margin: 1.5rem 0 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">Configurações de Turmas Horistas</h3><div class="form-grid"><div class="form-group full-width"><label for="setting-valor-hora-aula">Valor da Hora/Aula (R$)</label><input type="number" id="setting-valor-hora-aula" step="0.01" min="0" required></div></div><div class="modal-actions"><button type="button" id="settings-cancel-btn" class="btn">Cancelar</button><button type="submit" id="settings-save-btn" class="btn btn-primary"><span class="btn-text">Salvar Configurações</span><div class="spinner"></div></button></div></form></div></div>
-    <div id="risco-alunos-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 1000px;"><h2 id="risco-alunos-modal-title" class="view-title">Alunos em Risco</h2><div id="risco-alunos-table-container"></div><div class="modal-actions"><button type="button" id="risco-alunos-close-btn" class="btn">Fechar</button></div></div></div>
-    <div id="bulk-export-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 500px;"><h2 class="view-title">Exportar Boletins da Sala</h2><p>Como você deseja exportar os boletins desta sala?</p><div class="modal-actions" style="justify-content: center; margin-top: 2rem; gap: 1rem;"><button type="button" id="export-conjunto-btn" class="btn btn-primary"><span class="btn-text">Arquivo Conjunto (Recomendado)</span><div class="spinner"></div></button><button type="button" id="export-unicos-btn" class="btn"><span class="btn-text">Arquivos Únicos</span><div class="spinner"></div></button></div><div style="text-align: center; margin-top: 1rem;"><button type="button" id="bulk-export-cancel-btn" class="btn">Cancelar</button></div></div></div>
-    <div id="search-modal" class="modal-backdrop"><div class="search-modal-container"><button id="search-modal-close-btn" class="btn btn-icon" aria-label="Fechar Pesquisa"><svg class="btn-icon-svg" fill="currentColor" width="24" height="24" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg></button><input type="search" id="search-modal-input" placeholder="Pesquisar alunos, turmas, livros, conteúdos..."><div id="search-modal-results"><div class="empty-state" style="padding-top: 4rem;"><p>Pesquise por qualquer termo para encontrar o que precisa.</p></div></div></div></div>
-    <div id="risk-report-feedback-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 700px;"><h2 class="view-title">Adicionar Feedback ao Relatório</h2><p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Este feedback será incluído no relatório impresso do aluno. Ambos os campos são opcionais.</p><form id="risk-report-feedback-form"><div class="form-group"><label for="risk-feedback-general">Feedback Geral (Comportamentos recorrentes)</label><textarea id="risk-feedback-general" style="min-height: 100px;"></textarea></div><div class="form-group"><label for="risk-feedback-specific">Feedback Específico (Causas das situações de risco)</label><textarea id="risk-feedback-specific" style="min-height: 100px;"></textarea></div><div class="form-group" id="risk-feedback-default-text-group" style="display: none;"><label class="checkbox-group" style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 400;"><input type="checkbox" id="risk-feedback-include-default" style="width: auto;"><span>Incluir sugestão de texto padrão abaixo do meu feedback</span></label></div><div class="modal-actions"><button type="button" id="risk-feedback-cancel-btn" class="btn">Cancelar</button><button type="submit" class="btn btn-primary"><span class="btn-text">Gerar e Imprimir Relatório</span><div class="spinner"></div></button></div></form></div></div>
+
+    <div id="recurso-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="recurso-modal-title" class="view-title">Adicionar Material</h2>
+            <form id="recurso-form">
+                <input type="hidden" id="recurso-id">
+                <div class="form-group">
+                    <label for="recurso-livro">Nome do Livro</label>
+                    <input type="text" id="recurso-livro" placeholder="Ex: Book 1" required>
+                </div>
+                <div class="form-group">
+                    <label for="recurso-pagina">Página do Livro</label>
+                    <input type="number" id="recurso-pagina" placeholder="Ex: 25" required>
+                </div>
+                <div class="form-group">
+                    <label for="recurso-tipo">Tipo do Material</label>
+                    <select id="recurso-tipo" required>
+                        <option value="Exercício Impresso">Exercício Impresso</option>
+                        <option value="Kahoot">Kahoot</option>
+                        <option value="Google Slides">Google Slides</option>
+                        <option value="Vídeo">Vídeo</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="recurso-assunto">Assunto</label>
+                    <input type="text" id="recurso-assunto" placeholder="Ex: To Be Verb" required>
+                </div>
+                <div class="form-group">
+                    <label for="recurso-link">Link do Material (opcional)</label>
+                    <input type="url" id="recurso-link" placeholder="https://kahoot.it/...">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="recurso-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="recurso-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="prova-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="prova-modal-title" class="view-title">Adicionar Nova Prova</h2>
+            <form id="prova-form">
+                <input type="hidden" id="prova-id">
+                 <div class="form-group">
+                    <label for="prova-category">Categoria do Livro</label>
+                    <select id="prova-category" required>
+                        <option value="new">New Book</option>
+                        <option value="old">Old Book</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="prova-livro">Nome do Livro</label>
+                    <input type="text" id="prova-livro" placeholder="Ex: Book 3" required>
+                </div>
+                <div class="form-group">
+                    <label for="prova-tipo">Tipo da Prova</label>
+                    <select id="prova-tipo" required>
+                        <option value="Prova Normal">Prova Normal</option>
+                        <option value="Prova Conjunta">Prova Conjunta</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="prova-temas">Temas Aplicados</label>
+                    <textarea id="prova-temas" placeholder="Ex: Plural; Name; Family; Personality..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="prova-linkEscrita">Link da Prova Escrita (opcional)</label>
+                    <input type="url" id="prova-linkEscrita" placeholder="https://forms.gle/...">
+                </div>
+                 <div class="form-group">
+                    <label for="prova-linkOral">Link da Prova Oral (opcional)</label>
+                    <input type="url" id="prova-linkOral" placeholder="https://docs.google.com/document/...">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="prova-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="prova-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="ferias-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <h2 class="view-title">Registrar Férias! 🎉</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Selecione o período para registrar férias no sistema.</p>
+            <form id="ferias-form">
+                <div class="form-group">
+                    <label for="ferias-start-date">Início das Férias</label>
+                    <input type="date" id="ferias-start-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="ferias-end-date">Fim das Férias</label>
+                    <input type="date" id="ferias-end-date" required>
+                </div>
+                <div class="modal-actions" style="justify-content: center;">
+                    <button type="button" id="ferias-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="ferias-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Confirmar</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="aula-dia-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h2 id="aula-dia-modal-title" class="view-title">Planejar Nova Aula</h2>
+            <form id="aula-dia-form">
+                <input type="hidden" id="aula-dia-id">
+                
+                <div class="form-group">
+                    <label for="aula-dia-date">Data</label>
+                    <input type="date" id="aula-dia-date" required>
+                </div>
+
+                <div class="form-group full-width" id="sem-aula-toggle-group">
+                    <label>
+                        <input type="checkbox" id="aula-dia-sem-aula-check">
+                        Marcar este dia como "Sem Aula" (Feriado, Evento, etc.)
+                    </label>
+                </div>
+
+                <div id="sem-aula-details-group" class="form-grid" style="display: none;">
+                    <div class="form-group">
+                        <label for="sem-aula-tipo">Tipo de Evento</label>
+                        <select id="sem-aula-tipo">
+                            <option value="Feriado">Feriado</option>
+                            <option value="Evento">Evento Escolar</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: 2 / -1;">
+                        <label for="sem-aula-descricao">Descrição</label>
+                        <input type="text" id="sem-aula-descricao" placeholder="Ex: Feriado de Corpus Christi">
+                    </div>
+                </div>
+                
+                <div id="aula-principal-form-grid">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="aula-dia-turma">Turma</label>
+                            <input type="text" id="aula-dia-turma" list="turmas-list" placeholder="Ex: SQ18h" autocomplete="off">
+                            <datalist id="turmas-list">
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label for="aula-dia-linguagem">Idioma</label>
+                            <select id="aula-dia-linguagem">
+                                <option value="PT">Português (PT)</option>
+                                <option value="EN">Inglês (EN)</option>
+                            </select>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="aula-dia-tema">Tema Principal da Aula</label>
+                            <input type="text" id="aula-dia-tema" placeholder="Ex: Verb To Be Review">
+                        </div>
+                        
+                        <div class="form-group full-width" style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                            <label for="aula-dia-onde-parou">Onde Parou (Aula Anterior)</label>
+                             <div class="form-grid" style="gap: 0.5rem 1rem;">
+                                <select id="aula-dia-livro-parou" style="grid-column: 1 / 2;">
+                                </select>
+                                <textarea id="aula-dia-onde-parou" placeholder="Conteúdo da aula anterior..." style="grid-column: 2 / -1; min-height: 80px;"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="aula-dia-hoje">Planejamento da Aula de Hoje (para Chamada)</label>
+                             <div class="form-grid" style="gap: 0.5rem 1rem;">
+                                 <select id="aula-dia-livro-hoje" style="grid-column: 1 / 2;" required>
+                                 </select>
+                                <textarea id="aula-dia-hoje" placeholder="Descreva as atividades, páginas e exercícios..." style="grid-column: 2 / -1;"></textarea>
+                            </div>
+                        </div>
+                         <div class="form-group full-width">
+                            <label for="aula-dia-seguinte">Conteúdo para a Próxima Aula (Opcional)</label>
+                            <textarea id="aula-dia-seguinte" placeholder="Cole aqui o conteúdo que não deu tempo de aplicar..." style="min-height: 80px;"></textarea>
+                        </div>
+
+                        <div class="form-group full-width">
+                            <label for="aula-dia-anotacoes">Anotações (Opcional)</label>
+                            <textarea id="aula-dia-anotacoes" placeholder="Observações sobre a turma, preparativos, etc." style="min-height: 80px;"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="aula-dia-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="aula-dia-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="freelance-aula-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h2 id="freelance-aula-modal-title" class="view-title">Registrar Aula Horista Avulsa</h2>
+            <form id="freelance-aula-form">
+                <input type="hidden" id="freelance-aula-id">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
+                        <label for="freelance-aula-date">Data</label>
+                        <input type="date" id="freelance-aula-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="freelance-aula-duracao">Duração (horas)</label>
+                        <input type="number" id="freelance-aula-duracao" min="0.5" step="0.5" value="1.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="freelance-aula-turma">Turma / Referência</label>
+                        <input type="text" id="freelance-aula-turma" placeholder="Ex: Reforço Maria" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="freelance-aula-escola">Escola (Opcional)</label>
+                        <input type="text" id="freelance-aula-escola" placeholder="Ex: Colégio XYZ">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="freelance-aula-conteudo">Conteúdo Aplicado</label>
+                    <textarea id="freelance-aula-conteudo" placeholder="Descreva as atividades e tópicos abordados..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="freelance-aula-anotacoes">Anotações (Opcional)</label>
+                    <textarea id="freelance-aula-anotacoes" placeholder="Observações sobre a aula, desempenho, etc." style="min-height: 80px;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="freelance-aula-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="freelance-aula-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar Aula</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="calendario-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h2 id="calendario-modal-title" class="view-title">Adicionar Evento</h2>
+            <form id="calendario-form">
+                <input type="hidden" id="calendario-evento-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="calendario-evento-date">Data</label>
+                        <input type="date" id="calendario-evento-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="calendario-evento-tipo">Tipo</label>
+                        <select id="calendario-evento-tipo" required>
+                            <option value="evento">Evento Escolar</option>
+                            <option value="feriado">Feriado</option>
+                            <option value="sem-aula">Dia Sem Aula (Ponto Facultativo, etc)</option>
+                            <option value="lembrete">Lembrete Pessoal</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="calendario-evento-title">Título</label>
+                        <input type="text" id="calendario-evento-title" placeholder="Ex: Festa Junina" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="calendario-evento-description">Descrição (Opcional)</label>
+                        <textarea id="calendario-evento-description" placeholder="Detalhes sobre o evento..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="calendario-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="calendario-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <div id="delete-confirm-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 class="view-title">Confirmar Exclusão</h2>
+            <p id="delete-confirm-message">Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.</p>
+            <div class="modal-actions">
+                <button type="button" id="cancel-delete-btn" class="btn">Cancelar</button>
+                <button type="button" id="confirm-delete-btn" class="btn btn-primary" style="background-color: var(--error-color); border-color: transparent;">
+                    <span class="btn-text">Excluir</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="import-confirm-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 class="view-title">Confirmar Importação</h2>
+            <p>Tem certeza de que deseja importar este arquivo? Todos os dados atuais (avisos, recursos, provas, aulas, nome da escola, etc.) serão substituídos. Esta ação não pode ser desfeita.</p>
+            <div class="modal-actions">
+                <button type="button" id="cancel-import-btn" class="btn">Cancelar</button>
+                <button type="button" id="confirm-import-btn" class="btn btn-primary">
+                    <span class="btn-text">Importar</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sala-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="sala-modal-title" class="view-title">Adicionar Nova Sala</h2>
+            <form id="sala-form">
+                <input type="hidden" id="sala-id">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
+                        <label for="sala-nome">Nome da Sala</label>
+                        <input type="text" id="sala-nome" placeholder="Ex: SQA20h" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sala-tipo">Tipo de Turma</label>
+                        <select id="sala-tipo" required>
+                            <option value="Regular">Regular</option>
+                            <option value="Horista">Horista</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sala-data-inicio">Data de Início</label>
+                        <input type="date" id="sala-data-inicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="sala-data-fim">Data Prevista de Fim</label>
+                        <input type="date" id="sala-data-fim" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Dias da Semana</label>
+                        <div id="sala-dias-semana" class="checkbox-group">
+                        </div>
+                    </div>
+                </div>
+                <div id="sala-horista-fields" style="display: none; border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;">
+                    <h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Detalhes da Turma Horista</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="sala-escola-horista">Nome da Escola</label>
+                            <input type="text" id="sala-escola-horista" placeholder="Ex: Colégio ABC">
+                        </div>
+                        <div class="form-group">
+                            <label for="sala-duracao-aula">Duração da Aula (horas)</label>
+                            <input type="number" id="sala-duracao-aula" min="0.5" step="0.5" value="2">
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="sala-inicio-livro">Início do Livro</label>
+                            <select id="sala-inicio-livro">
+                                <option value="inicio">Começa do Início</option>
+                                <option value="meio">Começa do Meio do Livro</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="sala-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="sala-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="finalizar-sala-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 id="finalizar-sala-modal-title" class="view-title">Finalizar Sala</h2>
+            <form id="finalizar-sala-form">
+                <input type="hidden" id="finalizar-sala-id">
+                <p id="finalizar-sala-message" style="margin-bottom: 1.5rem;">Selecione o motivo para finalizar e arquivar esta sala. Ela será movida para a lista de "Salas Finalizadas".</p>
+                <div class="form-group">
+                    <label for="finalizar-sala-motivo">Motivo da Finalização</label>
+                    <select id="finalizar-sala-motivo" required>
+                        <option value="Curso concluído">Curso concluído</option>
+                        <option value="Troca de professor">Troca de professor</option>
+                        <option value="Turma desfeita">Turma desfeita</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                 <div class="form-group" id="finalizar-sala-detalhes-group" style="display: none;">
+                    <label for="finalizar-sala-detalhes">Detalhes</label>
+                    <textarea id="finalizar-sala-detalhes" placeholder="Forneça mais detalhes sobre o motivo."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="finalizar-sala-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="finalizar-sala-confirm-btn" class="btn btn-primary">
+                        <span class="btn-text">Confirmar Finalização</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="livro-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="livro-modal-title" class="view-title">Adicionar Novo Livro</h2>
+            <form id="livro-form">
+                <input type="hidden" id="livro-id">
+                <input type="hidden" id="livro-parent-sala-id">
+                <div class="form-grid">
+                     <div class="form-group full-width">
+                        <label for="livro-nome">Nome do Livro</label>
+                        <input type="text" id="livro-nome" placeholder="Ex: Book 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="livro-mes-inicio">Mês de Início</label>
+                        <input type="month" id="livro-mes-inicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="livro-mes-fim">Mês Previsto de Fim</label>
+                        <input type="month" id="livro-mes-fim" required>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="livro-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="livro-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="aluno-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="aluno-modal-title" class="view-title">Adicionar Novo Aluno</h2>
+            <form id="aluno-form">
+                <input type="hidden" id="aluno-id">
+                <input type="hidden" id="aluno-parent-sala-id">
+                <input type="hidden" id="aluno-parent-livro-id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="aluno-ctr">CTR</label>
+                        <input type="text" id="aluno-ctr" placeholder="Código do aluno" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="aluno-nome">Nome Completo</label>
+                        <input type="text" id="aluno-nome" placeholder="Nome do aluno" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="aluno-status">Status do Aluno</label>
+                        <select id="aluno-status" required>
+                            <option value="Ativo">Aluno Novo (Ativo)</option>
+                            <option value="Nivelamento">Nivelamento</option>
+                            <option value="Transferido (interno)">Transferido (de outra turma)</option>
+                            <option value="Transferido (externo)">Transferido (para outra unidade)</option>
+                            <option value="Desistente">Desistente / Não Frequente</option>
+                            <option value="Concluído">Concluiu o curso</option>
+                            <option value="Excluído">Excluído</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width" id="aluno-livro-inicio-group" style="display: none;">
+                        <label for="aluno-livro-inicio">Livro de Início</label>
+                        <select id="aluno-livro-inicio"></select>
+                    </div>
+                    <div class="form-group full-width" id="aluno-origem-group" style="display: none;">
+                        <label for="aluno-origem">Origem da Transferência</label>
+                        <input type="text" id="aluno-origem" placeholder="Ex: SQA19h">
+                    </div>
+                </div>
+                <div id="aluno-historico-group" class="full-width" style="display: none; border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;">
+                    <h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Dados de Progresso Anterior</h4>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="aluno-historico-presencas">Aulas que Assistiu (Presenças)</label>
+                            <input type="number" id="aluno-historico-presencas" placeholder="Ex: 5" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="aluno-historico-aulas-dadas">Total de Aulas Dadas (no Livro)</label>
+                            <input type="number" id="aluno-historico-aulas-dadas" placeholder="Ex: 8" min="0">
+                        </div>
+                    </div>
+                    <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                        <div class="form-group">
+                            <label for="aluno-historico-written">Nota Written</label>
+                            <input type="text" inputmode="decimal" id="aluno-historico-written" placeholder="Ex: 8,5">
+                        </div>
+                        <div class="form-group">
+                            <label for="aluno-historico-oral">Nota Oral</label>
+                            <input type="text" inputmode="decimal" id="aluno-historico-oral" placeholder="Ex: 9,0">
+                        </div>
+                        <div class="form-group">
+                            <label for="aluno-historico-participation">Nota Participation</label>
+                            <input type="text" inputmode="decimal" id="aluno-historico-participation" placeholder="Ex: 10,0">
+                        </div>
+                    </div>
+                </div>
+                 <div class="modal-actions">
+                    <button type="button" id="aluno-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="aluno-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="transfer-aluno-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="transfer-aluno-modal-title" class="view-title">Transferir Aluno</h2>
+            <form id="transfer-aluno-form">
+                <input type="hidden" id="transfer-source-sala-id">
+                <input type="hidden" id="transfer-source-livro-id">
+                <div class="form-group">
+                    <label for="transfer-aluno-select">Aluno a ser Transferido</label>
+                    <select id="transfer-aluno-select" required></select>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="transfer-dest-sala-select">Sala de Destino</label>
+                        <select id="transfer-dest-sala-select" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transfer-dest-livro-select">Livro de Destino</label>
+                        <select id="transfer-dest-livro-select" required></select>
+                    </div>
+                </div>
+                <div id="transfer-grades-group" class="form-group" style="display: none;">
+                    <label class="checkbox-group" style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 400;">
+                        <input type="checkbox" id="transfer-grades-check" style="width: auto;">
+                        <span>Manter notas (apenas se o livro for o mesmo. Ex: Book 2 para Book 2)</span>
+                    </label>
+                </div>
+                <div id="transfer-frequency-group" style="border-top: 1px solid var(--border-color); margin-top: 1rem; padding-top: 1rem;">
+                    <h4 style="color: var(--primary-blue); margin-bottom: 1rem;">Configuração de Frequência Inicial</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                        Defina a base de frequência do aluno no novo livro. As chamadas futuras serão somadas a estes valores.
+                    </p>
+                     <div class="form-grid">
+                        <div class="form-group">
+                            <label for="transfer-historico-aulas-dadas">Aulas Dadas no Novo Livro</label>
+                            <input type="number" id="transfer-historico-aulas-dadas" min="0" value="0" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="transfer-historico-presencas">Presenças Iniciais</label>
+                            <input type="number" id="transfer-historico-presencas" min="0" value="0" class="form-control">
+                        </div>
+                    </div>
+                    <button type="button" id="transfer-set-100-freq" class="btn" style="width: 100%; margin-top: 0.5rem;">
+                        <span class="btn-text">Dar 100% de Frequência (Baseado nas aulas já dadas na sala de destino)</span>
+                    </button>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="transfer-aluno-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="transfer-aluno-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Confirmar Transferência</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="aluno-particular-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 id="aluno-particular-modal-title" class="view-title">Adicionar Aluno Particular</h2>
+            <form id="aluno-particular-modal-form">
+                <input type="hidden" id="aluno-particular-modal-id-input">
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Você pode cadastrar um nome novo ou vincular a um aluno já existente no sistema para evitar duplicidade.
+                </p>
+                <div class="form-group">
+                    <label for="aluno-particular-modal-nome">Nome do Aluno</label>
+                    <input type="text" id="aluno-particular-modal-nome" placeholder="Digite o nome do aluno" required>
+                </div>
+                <div class="form-group">
+                    <label for="aluno-particular-modal-link">Vincular a Aluno Existente (Opcional)</label>
+                    <input type="text" id="aluno-particular-modal-link" list="alunos-matriculados-list" placeholder="Comece a digitar para buscar..." autocomplete="off">
+                    <datalist id="alunos-matriculados-list">
+                    </datalist>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="aluno-particular-modal-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="aluno-particular-modal-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="aula-particular-lesson-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <h2 id="aula-particular-lesson-modal-title" class="view-title">Registrar Nova Aula</h2>
+            <form id="aula-particular-lesson-form">
+                <input type="hidden" id="aula-particular-lesson-aluno-id">
+                <input type="hidden" id="aula-particular-lesson-id">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr 2fr;">
+                    <div class="form-group">
+                        <label for="aula-particular-lesson-modal-data">Data</label>
+                        <input type="date" id="aula-particular-lesson-modal-data" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="aula-particular-lesson-modal-livro">Livro (Opcional)</label>
+                        <input type="text" id="aula-particular-lesson-modal-livro" placeholder="Ex: Book 1">
+                    </div>
+                    <div class="form-group" style="grid-column: 3 / -1;">
+                        <label for="aula-particular-lesson-modal-temas">Temas da Aula</label>
+                        <input type="text" id="aula-particular-lesson-modal-temas" placeholder="Ex: Verb to Be, Simple Present" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="aula-particular-lesson-modal-sobras">Conteúdo para a Próxima Aula (Opcional)</label>
+                        <textarea id="aula-particular-lesson-modal-sobras" style="min-height: 80px;" placeholder="O que não deu tempo de aplicar..."></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="aula-particular-lesson-modal-observacoes">Observações (Opcional)</label>
+                        <textarea id="aula-particular-lesson-modal-observacoes" style="min-height: 80px;" placeholder="Notas sobre o desempenho do aluno, etc..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="aula-particular-lesson-modal-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">Salvar Aula</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="chamada-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 id="chamada-modal-title" class="view-title">Realizar Chamada</h2>
+            <form id="chamada-form">
+                <input type="hidden" id="chamada-aula-id">
+                <p style="margin-bottom: 1rem; color: var(--text-secondary);">Marque os alunos presentes na aula.</p>
+                <div id="chamada-alunos-list">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="chamada-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="chamada-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar Chamada</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="settings-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 class="view-title">Configurações Gerais</h2>
+            <form id="settings-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="setting-teacher-name">Nome do Professor</label>
+                        <input type="text" id="setting-teacher-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="setting-school-name">Nome da Escola</label>
+                        <input type="text" id="setting-school-name" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="setting-school-logo">URL do Logo da Escola (PNG/JPG)</label>
+                        <input type="url" id="setting-school-logo" placeholder="https://exemplo.com/logo.png">
+                        <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">A imagem será ajustada automaticamente para o cabeçalho do boletim.</small>
+                    </div>
+                </div>
+                <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--primary-blue); margin: 1.5rem 0 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">Configurações de Bônus</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="setting-bonus-value">Valor do Bônus por Aluno (R$)</label>
+                        <input type="number" id="setting-bonus-value" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="setting-min-alunos">Mínimo de Alunos Frequentes para Bônus</label>
+                        <input type="number" id="setting-min-alunos" step="1" min="0" required>
+                    </div>
+                </div>
+                <h3 style="font-size: 1.25rem; font-weight: 600; color: var(--primary-blue); margin: 1.5rem 0 1rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">Configurações de Turmas Horistas</h3>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="setting-valor-hora-aula">Valor da Hora/Aula (R$)</label>
+                        <input type="number" id="setting-valor-hora-aula" step="0.01" min="0" required>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="settings-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" id="settings-save-btn" class="btn btn-primary">
+                        <span class="btn-text">Salvar Configurações</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="risco-alunos-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 1000px;">
+            <h2 id="risco-alunos-modal-title" class="view-title">Alunos em Risco</h2>
+            <div id="risco-alunos-table-container">
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="risco-alunos-close-btn" class="btn">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-export-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2 class="view-title">Exportar Boletins da Sala</h2>
+            <p>Como você deseja exportar os boletins desta sala?</p>
+            <div class="modal-actions" style="justify-content: center; margin-top: 2rem; gap: 1rem;">
+                <button type="button" id="export-conjunto-btn" class="btn btn-primary">
+                    <span class="btn-text">Arquivo Conjunto (Recomendado)</span>
+                    <div class="spinner"></div>
+                </button>
+                <button type="button" id="export-unicos-btn" class="btn">
+                    <span class="btn-text">Arquivos Únicos</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+            <div style="text-align: center; margin-top: 1rem;">
+                 <button type="button" id="bulk-export-cancel-btn" class="btn">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="search-modal" class="modal-backdrop">
+        <div class="search-modal-container">
+            <button id="search-modal-close-btn" class="btn btn-icon" aria-label="Fechar Pesquisa">
+                 <svg class="btn-icon-svg" fill="currentColor" width="24" height="24" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"></path></svg>
+            </button>
+            <input type="search" id="search-modal-input" placeholder="Pesquisar alunos, turmas, livros, conteúdos...">
+            <div id="search-modal-results">
+                <div class="empty-state" style="padding-top: 4rem;">
+                    <p>Pesquise por qualquer termo para encontrar o que precisa.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="risk-report-feedback-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 700px;">
+            <h2 class="view-title">Adicionar Feedback ao Relatório</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Este feedback será incluído no relatório impresso do aluno. Ambos os campos são opcionais.</p>
+            <form id="risk-report-feedback-form">
+                <div class="form-group">
+                    <label for="risk-feedback-general">Feedback Geral (Comportamentos recorrentes)</label>
+                    <textarea id="risk-feedback-general" style="min-height: 100px;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="risk-feedback-specific">Feedback Específico (Causas das situações de risco)</label>
+                    <textarea id="risk-feedback-specific" style="min-height: 100px;"></textarea>
+                </div>
+                <div class="form-group" id="risk-feedback-default-text-group" style="display: none;">
+                    <label class="checkbox-group" style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 400;">
+                        <input type="checkbox" id="risk-feedback-include-default" style="width: auto;">
+                        <span>Incluir sugestão de texto padrão abaixo do meu feedback</span>
+                    </label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="risk-feedback-cancel-btn" class="btn">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">Gerar e Imprimir Relatório</span>
+                        <div class="spinner"></div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 
+      CONTÊINER DE IMPRESSÃO
+      Esta div oculta é usada para renderizar conteúdo específico para impressão,
+      como os boletins. Quando o usuário clica em "Imprimir", o JavaScript
+      injeta o HTML do boletim aqui e aciona a função de impressão do navegador.
+      As regras de CSS em @media print garantem que apenas este contêiner seja impresso.
+    -->
     <div id="print-container" aria-hidden="true"></div>
-    <div id="bulk-risk-report-modal" class="modal-backdrop"><div class="modal-content" style="max-width: 800px;"><h2 class="view-title">Selecionar Feedbacks para Relatório</h2><p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Selecione os pontos de atenção que você deseja incluir no relatório de risco completo.</p><div class="form-group"><label class="checkbox-group" style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 500; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 0.75rem;"><input type="checkbox" id="bulk-risk-select-all" style="width: auto;"><span>Selecionar Todos / Desmarcar Todos</span></label></div><div id="bulk-risk-selection-list" style="max-height: 50vh; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;"></div><div class="modal-actions"><button type="button" id="cancel-bulk-risk-report-btn" class="btn">Cancelar</button><button type="button" id="confirm-bulk-risk-report-btn" class="btn btn-primary"><span class="btn-text">Gerar e Imprimir Selecionados</span><div class="spinner"></div></button></div></div></div>
+
+    <div id="bulk-risk-report-modal" class="modal-backdrop">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 class="view-title">Selecionar Feedbacks para Relatório</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Selecione os pontos de atenção que você deseja incluir no relatório de risco completo.</p>
+            <div class="form-group">
+                <label class="checkbox-group" style="flex-direction: row; align-items: center; gap: 0.5rem; font-weight: 500; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 0.75rem;">
+                    <input type="checkbox" id="bulk-risk-select-all" style="width: auto;">
+                    <span>Selecionar Todos / Desmarcar Todos</span>
+                </label>
+            </div>
+            <div id="bulk-risk-selection-list" style="max-height: 50vh; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                <!-- Student and risk checkboxes will be injected here -->
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="cancel-bulk-risk-report-btn" class="btn">Cancelar</button>
+                <button type="button" id="confirm-bulk-risk-report-btn" class="btn btn-primary">
+                    <span class="btn-text">Gerar e Imprimir Selecionados</span>
+                    <div class="spinner"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 
+      CONTÊINER DE NOTIFICAÇÕES (TOASTS)
+      As notificações de feedback (ex: "Salvo com sucesso!") são adicionadas
+      dinamicamente a este contêiner, que é posicionado no canto da tela.
+      O atributo 'aria-live' é importante para acessibilidade, informando
+      leitores de tela sobre novas mensagens.
+    -->
     <div id="toast-container" aria-live="assertive"></div>
 
+    <!-- Rodapé da Aplicação -->
     <footer>
-        <p>Versão 2.24. &copy; 2025 Paulo Gabriel de L. S. Todos os direitos reservados.</p>
+        <p>Versão 2.23. &copy; 2025 Paulo Gabriel de L. S. Todos os direitos reservados.</p>
     </footer>
 
+    <!-- 
+      PONTO DE ENTRADA DO JAVASCRIPT
+      Este é o coração da aplicação. O atributo 'type="module"' permite o uso de
+      importações e exportações ES6 diretamente no navegador. O arquivo 'index.tsx'
+      será processado (compilado de TypeScript/JSX) e executado, dando vida à página.
+    -->
     <script type="module" src="index.tsx"></script>
 </body>
 </html>
