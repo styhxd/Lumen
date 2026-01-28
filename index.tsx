@@ -8,7 +8,7 @@
 import { supabase } from './src/supabaseClient.ts';
 import { showAuth, showApp } from './src/views/auth.ts';
 import { initUI, switchView, populateMobileMenu } from './src/ui.ts';
-import { loadAllData, initDataHandlers } from './src/data.ts';
+import { loadAllData, initDataHandlers, forceSave, runSystemDiagnostics } from './src/data.ts';
 import { initModals, handleDeleteClick, handleFinalizeClick } from './src/modals.ts';
 import { initAlunos, openSalaModal, openLivroModal, openAlunoModal, setAlunosViewState, renderAlunosView, renderSalasFinalizadasList, renderAlunosExcluidosList } from './src/views/alunos.ts';
 import { initAulasExtras, openAlunoParticularModal, openAulaParticularLessonModal, renderAulasExtrasView, setAulasExtrasViewState } from './src/views/aulasExtras.ts';
@@ -29,8 +29,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Se estiver salvando ou com dados pendentes que o debounce ainda não pegou
         if (state.isSaving || state.isDataDirty) {
             event.preventDefault();
-            event.returnValue = 'Ainda estamos salvando seus dados na nuvem. Aguarde um momento.';
-            return event.returnValue;
+            const message = 'Ainda estamos salvando seus dados na nuvem. Aguarde um momento.';
+            // Type assertion to handle differing TS definitions for returnValue (boolean vs string)
+            (event as any).returnValue = message;
+            return message;
         }
     });
 
@@ -47,6 +49,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     initNotas();
     initReports();
     initCalendario();
+
+    // Botão de Save Manual
+    document.getElementById('force-save-btn')?.addEventListener('click', forceSave);
+    
+    // Botão de Diagnóstico
+    document.getElementById('diagnostic-btn')?.addEventListener('click', runSystemDiagnostics);
 
     // =================================================================================
     // VERIFICAÇÃO DE AUTENTICAÇÃO E CARREGAMENTO

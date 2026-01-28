@@ -19,7 +19,7 @@ export let calendarioEventos: CalendarioEvento[] = [];
 
 // FLAGS DE ESTADO DA APLICAÇÃO
 export let isDataDirty = false;
-export let isSaving = false; // Nova flag para indicar salvamento em progresso
+export let isSaving = false; // Flag para indicar salvamento em progresso
 export let currentUserEmail: string | null = null; // Armazena o email do usuário logado
 
 // CONFIGURAÇÕES GLOBAIS
@@ -56,32 +56,12 @@ export function setCurrentUser(email: string | null) {
 
 export function setIsSaving(value: boolean) {
     isSaving = value;
-    updateSaveIndicator();
-}
-
-// Atualiza o indicador visual na UI com debounce visual para evitar flickering
-function updateSaveIndicator() {
-    const el = document.getElementById('save-status');
-    if (!el) return;
-    
-    if (isSaving) {
-        el.innerHTML = `<span class="spinner" style="position:static; display:inline-block; width:12px; height:12px; border-width:1px;"></span> Salvando...`;
-        el.style.color = 'var(--primary-blue)';
-    } else {
-        // Mostra "Salvo na nuvem" se não estiver sujo
-        el.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Salvo na nuvem`;
-        el.style.color = 'var(--text-secondary)';
-    }
+    // Removido: updateSaveIndicator() -> Agora gerenciado por data.ts
 }
 
 export function setDataDirty(value: boolean) {
     isDataDirty = value;
     if (value) {
-        const el = document.getElementById('save-status');
-        if (el) {
-            el.innerHTML = `<span style="color: var(--warning-color)">• Alterações pendentes</span>`;
-            el.style.color = 'var(--warning-color)';
-        }
         // Dispara o auto-save sempre que algo é marcado como sujo
         triggerAutoSave();
     }

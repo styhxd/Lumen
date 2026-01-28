@@ -3,7 +3,6 @@
  * =================================================================================
  * MÓDULO DE GERENCIAMENTO DE DADOS (src/data.ts)
  * =================================================================================
- * ESTRATÉGIA "ZERO SPINNER": Timeout Rígido e Fallback Nuclear
  */
 
 import * as state from './state.ts';
@@ -11,9 +10,9 @@ import * as dom from './dom.ts';
 import * as utils from './utils.ts';
 import { populateMobileMenu, switchView } from './ui.ts';
 import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso } from './types.ts';
-import { supabase, supabaseAdmin } from './supabaseClient.ts';
+import { supabase } from './supabaseClient.ts';
 
-// Imports de renderização
+// Imports de renderização (mantidos)
 import { renderAlunosView } from './views/alunos.ts';
 import { renderAulasExtrasView } from './views/aulasExtras.ts';
 import { renderAulaDoDia, renderAulasArquivadas } from './views/aulaDoDia.ts';
@@ -30,21 +29,145 @@ let saveTimeout: any = null;
 let isSaveInProgress = false;
 
 const STORAGE_KEY = 'lumen_data_v2';
-const HARD_TIMEOUT_MS = 4000; // 4 segundos máximo para qualquer operação de rede
 
 // =================================================================================
-// UTILITÁRIO DE REDE COM TIMEOUT (O SEGREDO PARA NÃO TRAVAR)
+// SISTEMA DE AUTODIAGNÓSTICO (AS 4 FASES)
 // =================================================================================
 
-/**
- * Envolve qualquer promessa em um timeout. Se a promessa original demorar,
- * o timeout rejeita e libera o fluxo do código.
- */
-async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-    const timeout = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error(`TIMEOUT: ${label}`)), ms)
-    );
-    return Promise.race([promise, timeout]);
+export async function runSystemDiagnostics() {
+    console.clear();
+    console.log("%c INICIANDO DIAGNÓSTICO DO SISTEMA LUMEN ", "background: #222; color: #bada55; font-size: 16px; padding: 10px; border-radius: 5px;");
+    let errors = [];
+
+    try {
+        // --- FASE 1: AUTENTICAÇÃO ---
+        console.group("%c FASE 1: Autenticação ", "color: #38bdf8; font-weight: bold; font-size: 12px;");
+        
+        // Teste 1.1: Cliente Inicializado
+        if (supabase) {
+            console.log("✅ [1.1] Cliente Supabase: Inicializado.");
+        } else {
+            console.error("❌ [1.1] Cliente Supabase: FALHA CRÍTICA. Variável nula.");
+            errors.push("Cliente Supabase não carregou.");
+        }
+
+        // Teste 1.2: Sessão Local
+        const sessionResponse = await supabase.auth.getSession();
+        if (sessionResponse.data.session) {
+            console.log("✅ [1.2] Sessão Local: Token presente (JWT).");
+        } else {
+            console.warn("⚠️ [1.2] Sessão Local: Nenhuma sessão encontrada. Usuário não logado.");
+            errors.push("Sem sessão local (Faça login novamente).");
+        }
+
+        // Teste 1.3: Validação no Servidor (GetUser)
+        const userResponse = await supabase.auth.getUser();
+        if (userResponse.data.user) {
+            console.log(`✅ [1.3] Validação Servidor: Usuário Confirmado (ID: ${userResponse.data.user.id})`);
+        } else {
+            console.error(`❌ [1.3] Validação Servidor: Token inválido ou expirado. Erro: ${userResponse.error?.message}`);
+            errors.push("Sessão expirada no servidor.");
+        }
+        console.groupEnd();
+
+
+        // --- FASE 2: DADOS E PAYLOAD ---
+        console.group("%c FASE 2: Gatilho e Dados ", "color: #f59e0b; font-weight: bold; font-size: 12px;");
+        
+        // Teste 2.1: Estado Sujo
+        console.log(`ℹ️ [2.1] Flag de Alteração (isDataDirty): ${state.isDataDirty}`);
+
+        // Teste 2.2: Geração do JSON
+        const payload = preparePayload();
+        if (payload && typeof payload === 'object') {
+            console.log("✅ [2.2] Preparação do Pacote: JSON gerado com sucesso.");
+        } else {
+            console.error("❌ [2.2] Preparação do Pacote: Falha ao gerar JSON.");
+            errors.push("Erro interno ao empacotar dados.");
+        }
+
+        // Teste 2.3: Tamanho do Payload
+        const jsonString = JSON.stringify(payload);
+        const sizeKB = (new Blob([jsonString]).size / 1024).toFixed(2);
+        console.log(`✅ [2.3] Tamanho do Pacote: ${sizeKB} KB (Limite seguro ~1000KB).`);
+        console.groupEnd();
+
+
+        // --- FASE 3: TRANSPORTE ---
+        console.group("%c FASE 3: Transporte (Rede) ", "color: #a78bfa; font-weight: bold; font-size: 12px;");
+
+        // Teste 3.1: Status Online
+        if (navigator.onLine) {
+            console.log("✅ [3.1] Navegador: Online.");
+        } else {
+            console.error("❌ [3.1] Navegador: OFFLINE. Impossível salvar.");
+            errors.push("Sem conexão com a internet.");
+        }
+
+        // Teste 3.2: User ID Disponível
+        const userId = userResponse.data.user?.id;
+        if (userId) {
+            console.log("✅ [3.2] ID do Usuário: Identificado para envio.");
+        } else {
+            console.error("❌ [3.2] ID do Usuário: NULO. Abortando transporte.");
+            errors.push("ID de usuário perdido.");
+        }
+        console.groupEnd();
+
+
+        // --- FASE 4: BANCO DE DADOS (SUPABASE) ---
+        console.group("%c FASE 4: Banco de Dados (Supabase) ", "color: #ef4444; font-weight: bold; font-size: 12px;");
+
+        if (userId) {
+            // Teste 4.1: Leitura (SELECT) - Verifica se a tabela existe e RLS de leitura
+            const { data: selectData, error: selectError } = await supabase
+                .from('user_data')
+                .select('user_id')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (selectError) {
+                console.error("❌ [4.1] Teste de Leitura: FALHOU.", selectError);
+                if (selectError.code === '42P01') errors.push("ERRO CRÍTICO: Tabela 'user_data' não existe no Supabase.");
+                else if (selectError.code === '42501') errors.push("ERRO RLS: Permissão negada para LER dados.");
+                else errors.push(`Erro Supabase (Leitura): ${selectError.message}`);
+            } else {
+                console.log(`✅ [4.1] Teste de Leitura: OK. ${selectData ? 'Registro encontrado.' : 'Tabela vazia (primeiro acesso).'}`);
+            }
+
+            // Teste 4.2: Escrita (UPSERT) - Tenta salvar de verdade
+            console.log("⏳ [4.2] Tentando gravar dados...");
+            const { error: upsertError } = await supabase
+                .from('user_data')
+                .upsert({ 
+                    user_id: userId, 
+                    email: userResponse.data.user?.email, 
+                    data: payload, 
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+            if (upsertError) {
+                console.error("❌ [4.2] Teste de Escrita: FALHOU.", upsertError);
+                if (upsertError.code === '42501') errors.push("ERRO RLS: Permissão negada para GRAVAR/CRIAR. Verifique a Policy 'Enable all actions'.");
+                else errors.push(`Erro Supabase (Escrita): ${upsertError.message}`);
+            } else {
+                console.log("✅ [4.2] Teste de Escrita: SUCESSO! Dados salvos.");
+            }
+        } else {
+            console.warn("⚠️ [4.x] Testes de Banco pulados por falta de autenticação.");
+        }
+        console.groupEnd();
+
+    } catch (e: any) {
+        console.error("ERRO INESPERADO NO DIAGNÓSTICO:", e);
+        errors.push(e.message);
+    }
+
+    if (errors.length > 0) {
+        alert(`DIAGNÓSTICO FINALIZADO COM ERROS:\n\n${errors.join('\n')}\n\nAbra o Console (F12) para detalhes técnicos.`);
+    } else {
+        alert("DIAGNÓSTICO FINALIZADO: Tudo parece correto! Seus dados foram salvos com sucesso na Fase 4.");
+    }
 }
 
 // =================================================================================
@@ -55,155 +178,124 @@ export function triggerAutoSave() {
     if (isSaveInProgress) return;
     if (saveTimeout) clearTimeout(saveTimeout);
     
-    state.setIsSaving(true); // Liga o spinner (feedback visual imediato)
+    updateSaveStatus('waiting'); // "Alterações pendentes..."
 
+    // Debounce de 3 segundos
     saveTimeout = setTimeout(async () => {
         await executeRobustSave();
-    }, 2000);
+    }, 3000);
+}
+
+// Função exportada para o botão manual "Salvar Agora"
+export async function forceSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    await executeRobustSave();
 }
 
 async function executeRobustSave() {
     if (isSaveInProgress) return;
     isSaveInProgress = true;
+    updateSaveStatus('saving');
 
-    // Prepara os dados
     const payload = preparePayload();
-    let saveResult = 'pending';
 
     try {
-        // 1. BACKUP LOCAL (Síncrono e Garantido)
+        // 1. BACKUP LOCAL (Sempre executa por segurança)
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-            localStorage.setItem(STORAGE_KEY + '_ts', new Date().toISOString());
-            console.log("✅ Backup Local OK");
-        } catch (e) {
-            console.error("❌ Erro LocalStorage", e);
+        } catch (localErr) {
+            console.warn("Falha no backup local:", localErr);
         }
 
-        // Verifica conexão básica
         if (!navigator.onLine) {
-            finishSave('warning', 'Salvo Offline');
+            updateSaveStatus('offline');
+            isSaveInProgress = false;
             return;
         }
 
-        // 2. TENTA OBTER USUÁRIO (Com Timeout)
-        // Se isso travar, o catch pega e seguimos vida.
-        const sessionResponse = await withTimeout(
-            supabase.auth.getSession(), 
-            2000, 
-            "Auth Check"
-        ).catch(() => ({ data: { session: null }, error: { message: "Timeout getting session" } }));
-
-        const user = (sessionResponse as any)?.data?.session?.user;
+        // 2. VERIFICA SESSÃO (CRÍTICO)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (!user) {
-            // Se não tem usuário logado no cliente normal, tenta salvar via Admin
-            // assumindo que talvez o token tenha expirado mas o app está aberto.
-            // Precisamos de um ID. Se não temos, falhamos o cloud save.
-            console.warn("⚠️ Sem sessão de usuário para salvar na nuvem.");
-            finishSave('warning', 'Salvo Localmente (Sem Login)');
+        if (sessionError || !session?.user) {
+            console.error("Erro de Sessão:", sessionError);
+            updateSaveStatus('error', 'Sem login');
+            // Se não tem sessão, tenta forçar o usuário a ver isso
+            utils.showToast("Sessão expirada. Recarregue a página e faça login.", "error");
+            isSaveInProgress = false;
             return;
         }
 
-        // 3. TENTATIVA PADRÃO (Com Timeout)
-        try {
-            console.log("☁️ Tentando salvar (Método Padrão)...");
-            const { error } = await withTimeout(
-                supabase
-                    .from('user_data')
-                    .upsert({ 
-                        user_id: user.id, 
-                        data: payload, 
-                        email: user.email, 
-                        updated_at: new Date() 
-                    }, { onConflict: 'user_id' }),
-                HARD_TIMEOUT_MS,
-                "Standard Upload"
-            ) as any;
+        const user = session.user;
 
-            if (!error) {
-                saveResult = 'success';
-            } else {
-                throw error; // Força cair no catch para tentar o Admin
-            }
-        } catch (stdError) {
-            console.warn("⚠️ Falha Padrão, ativando ADMIN MODE:", stdError);
-            
-            // 4. TENTATIVA NUCLEAR (ADMIN / SERVICE ROLE)
-            try {
-                const { error: adminError } = await withTimeout(
-                    supabaseAdmin
-                        .from('user_data')
-                        .upsert({ 
-                            user_id: user.id, 
-                            data: payload, 
-                            email: user.email, 
-                            updated_at: new Date() 
-                        }, { onConflict: 'user_id' }),
-                    HARD_TIMEOUT_MS,
-                    "Admin Upload"
-                ) as any;
+        // 3. SALVAR NO SUPABASE (Upsert)
+        console.log("Tentando salvar dados para usuário:", user.id);
 
-                if (!adminError) {
-                    saveResult = 'success_admin';
-                } else {
-                    console.error("❌ Falha Admin:", adminError);
-                    saveResult = 'error';
-                }
-            } catch (adminTimeErr) {
-                console.error("❌ Timeout Admin:", adminTimeErr);
-                saveResult = 'timeout';
+        const dbPayload = { 
+            user_id: user.id, 
+            email: user.email, 
+            data: payload, 
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabase
+            .from('user_data')
+            .upsert(dbPayload, { onConflict: 'user_id' });
+
+        if (error) {
+            console.error("ERRO SUPABASE DETALHADO NO SAVE:", error);
+            if (error.code === '42P01') {
+                alert("ERRO: A tabela 'user_data' não existe. Rode o script SQL no Supabase.");
+            } else if (error.code === '42501') {
+                alert("ERRO: Permissão negada (RLS). Verifique as Policies no Supabase.");
             }
+            throw error;
         }
 
-    } catch (generalError) {
-        console.error("💀 Erro Geral no Save:", generalError);
-        saveResult = 'crash';
+        // Sucesso!
+        console.log("Salvo com sucesso no Supabase!");
+        state.setDataDirty(false);
+        updateSaveStatus('success');
+
+    } catch (err: any) {
+        console.error("FALHA CRÍTICA AO SALVAR:", err);
+        updateSaveStatus('error', err.message || 'Erro desconhecido');
     } finally {
-        // === OBLITERAR O SPINNER ===
-        // Este bloco roda SEMPRE, não importa o que aconteça acima.
         isSaveInProgress = false;
-        
-        if (saveResult.startsWith('success')) {
-            finishSave('success', 'Salvo na Nuvem');
-        } else {
-            // Se falhou na nuvem, avisamos que está salvo localmente (o que é verdade pelo passo 1)
-            finishSave('warning', 'Salvo no Dispositivo');
-            // Mantém flag dirty para tentar de novo depois
-            state.setDataDirty(true); 
-        }
     }
 }
 
-function finishSave(status: 'success' | 'warning' | 'error', message: string) {
-    state.setIsSaving(false); // Desliga o spinner visualmente
-
-    if (status === 'success') {
-        state.setDataDirty(false); // Limpa a flag de "sujo"
-    }
-
+function updateSaveStatus(status: 'waiting' | 'saving' | 'success' | 'error' | 'offline', msg?: string) {
+    state.setIsSaving(status === 'saving');
+    
     const el = document.getElementById('save-status');
-    if (el) {
-        let color = 'var(--text-secondary)';
-        let icon = '✔';
-        
-        if (status === 'success') {
-            color = '#22c55e'; // Verde
-            icon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>`;
-        } else if (status === 'warning') {
-            color = 'var(--warning-color)'; // Amarelo
-            icon = '💾'; // Disquete para indicar local
-        } else {
-            color = 'var(--error-color)';
-            icon = '❌';
-        }
-        
-        el.innerHTML = `<span style="color: ${color}; font-weight: 600; display: flex; align-items: center; gap: 4px;">${icon} ${message}</span>`;
+    if (!el) return;
+
+    let content = '';
+    
+    switch (status) {
+        case 'waiting':
+            content = `<span style="color: var(--warning-color)">• Alterações pendentes</span>`;
+            break;
+        case 'saving':
+            content = `<span class="spinner" style="display:inline-block; width:12px; height:12px; border-width:2px; border-color:var(--primary-blue); border-right-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span> <span style="color: var(--primary-blue)">Salvando...</span>`;
+            break;
+        case 'success':
+            content = `<span style="color: #22c55e">✔ Salvo na Nuvem</span>`;
+            break;
+        case 'error':
+            content = `<span style="color: var(--error-color); font-weight:bold; cursor:pointer;" title="${msg || 'Clique para ver detalhes'}">❌ Erro (Clique para tentar)</span>`;
+            el.onclick = forceSave;
+            break;
+        case 'offline':
+            content = `<span style="color: var(--text-secondary)">☁️ Salvo Offline</span>`;
+            break;
     }
+    
+    el.innerHTML = content;
 }
 
 function preparePayload() {
-    // Deep clone para evitar mutação e remover referências circulares se existirem
+    // Deep clone simples para garantir snapshot limpo
     return JSON.parse(JSON.stringify({ 
         settings: state.settings,
         avisos: state.avisos, 
@@ -217,61 +309,57 @@ function preparePayload() {
 }
 
 // =================================================================================
-// CARREGAMENTO DE DADOS (HÍBRIDO COM FAILSAFE)
+// CARREGAMENTO DE DADOS
 // =================================================================================
 
 export async function loadAllData() {
     let finalData = null;
-    let source = '';
+    let source = 'Novo Perfil';
 
-    // 1. Carrega do LocalStorage (Sempre funciona e é rápido)
+    // 1. Tenta Nuvem Primeiro
     try {
-        const localRaw = localStorage.getItem(STORAGE_KEY);
-        if (localRaw) {
-            finalData = JSON.parse(localRaw);
-            source = 'Local';
-        }
-    } catch(e) { console.error("Erro leitura local", e); }
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+            const { data, error } = await supabase
+                .from('user_data')
+                .select('data')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
 
-    // 2. Tenta Nuvem (Admin Mode para garantir leitura sem RLS issues)
-    try {
-        const sessionRes = await withTimeout(supabase.auth.getSession(), 2000, "Load Session");
-        const user = (sessionRes as any)?.data?.session?.user;
-
-        if (user) {
-            // Tenta ler com Admin Client para pular qualquer regra de segurança bugada
-            const { data, error } = await withTimeout(
-                supabaseAdmin
-                    .from('user_data')
-                    .select('data')
-                    .eq('user_id', user.id)
-                    .maybeSingle(),
-                3000,
-                "Cloud Load"
-            ) as any;
-
-            if (!error && data && data.data) {
-                // Se temos dados na nuvem, usamos eles (assumindo que a nuvem é a verdade se disponível)
-                // O ideal seria comparar timestamps, mas para este fix, priorizamos a nuvem se ela responder.
+            if (error) {
+                console.error("Erro ao ler da nuvem:", error);
+                utils.showToast(`Erro ao carregar da nuvem: ${error.message}`, "error");
+            } else if (data && data.data) {
                 finalData = data.data;
                 source = 'Nuvem';
             }
         }
     } catch (e) {
-        console.warn("Nuvem lenta ou indisponível, usando dados locais.", e);
+        console.warn("Falha de conexão ao carregar:", e);
     }
 
-    // 3. Aplica os dados (o que tiver conseguido)
+    // 2. Fallback Local
+    if (!finalData) {
+        try {
+            const localRaw = localStorage.getItem(STORAGE_KEY);
+            if (localRaw) {
+                finalData = JSON.parse(localRaw);
+                source = 'Local';
+            }
+        } catch(e) { console.error("Erro leitura local", e); }
+    }
+
+    // 3. Aplica
     if (finalData) {
         applyData(finalData);
-        console.log(`Dados aplicados de: ${source}`);
+        console.log(`Dados carregados de: ${source}`);
         if (source === 'Local') {
-            utils.showToast('Modo Offline: Dados locais carregados.', 'warning');
-            state.setDataDirty(true); // Tenta subir para a nuvem na próxima oportunidade
+            utils.showToast('Dados locais carregados. (Sincronização pendente)', 'warning');
+            state.setDataDirty(true); // Força sync na próxima oportunidade
         }
     } else {
         initDefaults();
-        console.log("Iniciando perfil limpo.");
     }
 
     renderAllViews();
@@ -314,11 +402,9 @@ function initDefaults() {
     Object.assign(state.settings, defaultSettings);
     dom.schoolNameEl.textContent = state.settings.schoolName;
     state.setCalendarioEventos(getInitialHolidays());
-    state.setAvisos([]); state.setRecursos([]); state.setProvas([]);
-    state.setAulas([]); state.setSalas([]); state.setAlunosParticulares([]);
 }
 
-// --- Funções Auxiliares de Datas ---
+// Funções Auxiliares de Datas (mantidas)
 const addDays = (date: Date, days: number): Date => {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
@@ -439,7 +525,7 @@ export function deduplicateAndSanitizeProgress() {
     });
 }
 
-// Funções de Import/Export e Manipuladores
+// Funções de Import/Export (mantidas)
 function handleExport() {
     const hasData = [state.avisos, state.recursos, state.provas, state.aulas, state.salas, state.alunosParticulares, state.calendarioEventos].some(arr => arr.length > 0);
     if (!hasData) return utils.showToast('Não há dados para exportar.', 'warning');
