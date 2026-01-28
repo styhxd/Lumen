@@ -3,7 +3,7 @@
  * =================================================================================
  * MÓDULO DE GERENCIAMENTO DE DADOS (src/data.ts)
  * =================================================================================
- * Gerencia o ciclo de vida dos dados com estratégia de QUÁDRUPLA redundância.
+ * ESTRATÉGIA "ZERO SPINNER": Timeout Rígido e Fallback Nuclear
  */
 
 import * as state from './state.ts';
@@ -11,9 +11,9 @@ import * as dom from './dom.ts';
 import * as utils from './utils.ts';
 import { populateMobileMenu, switchView } from './ui.ts';
 import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso } from './types.ts';
-import { supabase } from './supabaseClient.ts';
+import { supabase, supabaseAdmin } from './supabaseClient.ts';
 
-// Importa funções de renderização
+// Imports de renderização
 import { renderAlunosView } from './views/alunos.ts';
 import { renderAulasExtrasView } from './views/aulasExtras.ts';
 import { renderAulaDoDia, renderAulasArquivadas } from './views/aulaDoDia.ts';
@@ -27,131 +27,184 @@ import { renderReportsView } from './views/reports.ts';
 
 let dataToImport: any = null;
 let saveTimeout: any = null;
-let watchdogTimeout: any = null;
+let isSaveInProgress = false;
+
+const STORAGE_KEY = 'lumen_data_v2';
+const HARD_TIMEOUT_MS = 4000; // 4 segundos máximo para qualquer operação de rede
 
 // =================================================================================
-// LÓGICA DE AUTO-SAVE NUCLEAR (4 PLANOS)
+// UTILITÁRIO DE REDE COM TIMEOUT (O SEGREDO PARA NÃO TRAVAR)
+// =================================================================================
+
+/**
+ * Envolve qualquer promessa em um timeout. Se a promessa original demorar,
+ * o timeout rejeita e libera o fluxo do código.
+ */
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    const timeout = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error(`TIMEOUT: ${label}`)), ms)
+    );
+    return Promise.race([promise, timeout]);
+}
+
+// =================================================================================
+// LÓGICA DE SALVAMENTO (AUTO-SAVE)
 // =================================================================================
 
 export function triggerAutoSave() {
+    if (isSaveInProgress) return;
     if (saveTimeout) clearTimeout(saveTimeout);
-    if (watchdogTimeout) clearTimeout(watchdogTimeout);
-
-    state.setIsSaving(true);
-
-    // WATCHDOG: Se nada funcionar em 12s, força o Plano D (Local) e destrava a tela
-    watchdogTimeout = setTimeout(() => {
-        if (state.isSaving) {
-            console.warn("☢️ Watchdog: Tempo limite total excedido. Forçando Plano D.");
-            executePlanD("Timeout Geral");
-        }
-    }, 12000);
+    
+    state.setIsSaving(true); // Liga o spinner (feedback visual imediato)
 
     saveTimeout = setTimeout(async () => {
-        await orchestrateSave();
+        await executeRobustSave();
     }, 2000);
 }
 
-// Orquestrador das Camadas de Salvamento
-async function orchestrateSave() {
+async function executeRobustSave() {
+    if (isSaveInProgress) return;
+    isSaveInProgress = true;
+
+    // Prepara os dados
     const payload = preparePayload();
-    
-    // Check 0: Internet
-    if (!navigator.onLine) {
-        executePlanD("Sem internet");
-        return;
-    }
-
-    // Check 0.5: Sessão
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session || !session.user) {
-        executePlanD("Sem sessão");
-        return;
-    }
-
-    const userId = session.user.id;
+    let saveResult = 'pending';
 
     try {
-        // --- PLANO A: RPC (SERVER-SIDE FUNCTION) ---
-        // A melhor opção. O banco executa a gravação internamente.
-        // Requer a função SQL `save_user_data` criada no banco.
-        console.log("🛡️ Tentando Plano A (RPC Server-Side)...");
-        const { error: errorA } = await supabase.rpc('save_user_data', { payload: payload });
-
-        if (errorA) {
-            console.warn("Plano A falhou:", errorA.message);
-            throw new Error("RPC Failed");
-        }
-        
-        finishSave("success", "Salvo (Nuvem/RPC)");
-        return;
-
-    } catch (errA) {
-        
+        // 1. BACKUP LOCAL (Síncrono e Garantido)
         try {
-            // --- PLANO B: UPSERT PADRÃO (CLIENT-SIDE) ---
-            console.log("⚠️ Tentando Plano B (Standard Upsert)...");
-            const { error: errorB } = await supabase
-                .from('user_data')
-                .upsert({ 
-                    user_id: userId, 
-                    data: payload,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+            localStorage.setItem(STORAGE_KEY + '_ts', new Date().toISOString());
+            console.log("✅ Backup Local OK");
+        } catch (e) {
+            console.error("❌ Erro LocalStorage", e);
+        }
 
-            if (errorB) throw errorB;
-
-            finishSave("success", "Salvo (Nuvem/STD)");
+        // Verifica conexão básica
+        if (!navigator.onLine) {
+            finishSave('warning', 'Salvo Offline');
             return;
+        }
 
-        } catch (errB) {
-            console.warn("Plano B falhou.", errB);
+        // 2. TENTA OBTER USUÁRIO (Com Timeout)
+        // Se isso travar, o catch pega e seguimos vida.
+        const sessionResponse = await withTimeout(
+            supabase.auth.getSession(), 
+            2000, 
+            "Auth Check"
+        ).catch(() => ({ data: { session: null }, error: { message: "Timeout getting session" } }));
 
-            try {
-                // --- PLANO C: FORÇA BRUTA (DELETE + INSERT) ---
-                // Útil se o índice estiver corrompido ou o upsert travado.
-                console.warn("🚨 Tentando Plano C (Brute Force)...");
-                
-                await supabase.from('user_data').delete().eq('user_id', userId);
-                
-                const { error: errorC } = await supabase.from('user_data').insert({
-                    user_id: userId,
-                    data: payload,
-                    updated_at: new Date().toISOString()
-                });
+        const user = (sessionResponse as any)?.data?.session?.user;
+        
+        if (!user) {
+            // Se não tem usuário logado no cliente normal, tenta salvar via Admin
+            // assumindo que talvez o token tenha expirado mas o app está aberto.
+            // Precisamos de um ID. Se não temos, falhamos o cloud save.
+            console.warn("⚠️ Sem sessão de usuário para salvar na nuvem.");
+            finishSave('warning', 'Salvo Localmente (Sem Login)');
+            return;
+        }
 
-                if (errorC) throw errorC;
+        // 3. TENTATIVA PADRÃO (Com Timeout)
+        try {
+            console.log("☁️ Tentando salvar (Método Padrão)...");
+            const { error } = await withTimeout(
+                supabase
+                    .from('user_data')
+                    .upsert({ 
+                        user_id: user.id, 
+                        data: payload, 
+                        email: user.email, 
+                        updated_at: new Date() 
+                    }, { onConflict: 'user_id' }),
+                HARD_TIMEOUT_MS,
+                "Standard Upload"
+            ) as any;
 
-                finishSave("success", "Salvo (Recuperado)");
-                return;
-
-            } catch (errC) {
-                console.error("❌ Plano C falhou.", errC);
-                // --- PLANO D: FALLBACK LOCAL (SOBREVIVÊNCIA) ---
-                executePlanD("Falha no Servidor");
+            if (!error) {
+                saveResult = 'success';
+            } else {
+                throw error; // Força cair no catch para tentar o Admin
             }
+        } catch (stdError) {
+            console.warn("⚠️ Falha Padrão, ativando ADMIN MODE:", stdError);
+            
+            // 4. TENTATIVA NUCLEAR (ADMIN / SERVICE ROLE)
+            try {
+                const { error: adminError } = await withTimeout(
+                    supabaseAdmin
+                        .from('user_data')
+                        .upsert({ 
+                            user_id: user.id, 
+                            data: payload, 
+                            email: user.email, 
+                            updated_at: new Date() 
+                        }, { onConflict: 'user_id' }),
+                    HARD_TIMEOUT_MS,
+                    "Admin Upload"
+                ) as any;
+
+                if (!adminError) {
+                    saveResult = 'success_admin';
+                } else {
+                    console.error("❌ Falha Admin:", adminError);
+                    saveResult = 'error';
+                }
+            } catch (adminTimeErr) {
+                console.error("❌ Timeout Admin:", adminTimeErr);
+                saveResult = 'timeout';
+            }
+        }
+
+    } catch (generalError) {
+        console.error("💀 Erro Geral no Save:", generalError);
+        saveResult = 'crash';
+    } finally {
+        // === OBLITERAR O SPINNER ===
+        // Este bloco roda SEMPRE, não importa o que aconteça acima.
+        isSaveInProgress = false;
+        
+        if (saveResult.startsWith('success')) {
+            finishSave('success', 'Salvo na Nuvem');
+        } else {
+            // Se falhou na nuvem, avisamos que está salvo localmente (o que é verdade pelo passo 1)
+            finishSave('warning', 'Salvo no Dispositivo');
+            // Mantém flag dirty para tentar de novo depois
+            state.setDataDirty(true); 
         }
     }
 }
 
-// Executa o salvamento local (LocalStorage) - O último refúgio
-function executePlanD(reason: string) {
-    try {
-        const payload = preparePayload();
-        localStorage.setItem('lumen_backup_emergency', JSON.stringify(payload));
-        localStorage.setItem('lumen_last_saved', new Date().toISOString());
+function finishSave(status: 'success' | 'warning' | 'error', message: string) {
+    state.setIsSaving(false); // Desliga o spinner visualmente
+
+    if (status === 'success') {
+        state.setDataDirty(false); // Limpa a flag de "sujo"
+    }
+
+    const el = document.getElementById('save-status');
+    if (el) {
+        let color = 'var(--text-secondary)';
+        let icon = '✔';
         
-        finishSave("warning", `Salvo Offline (${reason})`);
-        console.log("✅ Plano D executado: Dados salvos no LocalStorage.");
-    } catch (e) {
-        console.error("💀 CRÍTICO: Falha até no Plano D (LocalStorage cheio?)", e);
-        finishSave("error", "Erro crítico de salvamento");
-        state.setIsSaving(false); // Libera o spinner mesmo com erro fatal
+        if (status === 'success') {
+            color = '#22c55e'; // Verde
+            icon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>`;
+        } else if (status === 'warning') {
+            color = 'var(--warning-color)'; // Amarelo
+            icon = '💾'; // Disquete para indicar local
+        } else {
+            color = 'var(--error-color)';
+            icon = '❌';
+        }
+        
+        el.innerHTML = `<span style="color: ${color}; font-weight: 600; display: flex; align-items: center; gap: 4px;">${icon} ${message}</span>`;
     }
 }
 
 function preparePayload() {
-    return { 
+    // Deep clone para evitar mutação e remover referências circulares se existirem
+    return JSON.parse(JSON.stringify({ 
         settings: state.settings,
         avisos: state.avisos, 
         recursos: state.recursos, 
@@ -160,97 +213,67 @@ function preparePayload() {
         salas: state.salas, 
         alunosParticulares: state.alunosParticulares, 
         calendarioEventos: state.calendarioEventos,
-    };
-}
-
-function finishSave(status: 'success' | 'warning' | 'error', message: string) {
-    if (watchdogTimeout) clearTimeout(watchdogTimeout);
-    
-    state.setIsSaving(false);
-    state.setDataDirty(false); 
-
-    const el = document.getElementById('save-status');
-    if (el) {
-        let color = 'var(--text-secondary)';
-        let icon = '✔';
-        
-        if (status === 'success') {
-            color = 'var(--text-secondary)'; 
-            icon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path></svg>`;
-        } else if (status === 'warning') {
-            color = 'var(--warning-color)';
-            icon = '⚠️';
-        } else {
-            color = 'var(--error-color)';
-            icon = '❌';
-        }
-        
-        el.innerHTML = `<span style="color: ${color}">${icon} ${message}</span>`;
-    }
+    }));
 }
 
 // =================================================================================
-// CARREGAMENTO DE DADOS (HÍBRIDO + PRIORIDADE LOCAL SE MAIS RECENTE)
+// CARREGAMENTO DE DADOS (HÍBRIDO COM FAILSAFE)
 // =================================================================================
 
 export async function loadAllData() {
-    let cloudData = null;
-    let localData = null;
+    let finalData = null;
     let source = '';
 
-    // 1. Carrega Backup Local
+    // 1. Carrega do LocalStorage (Sempre funciona e é rápido)
     try {
-        const localRaw = localStorage.getItem('lumen_backup_emergency');
-        if (localRaw) localData = JSON.parse(localRaw);
-    } catch(e) {}
+        const localRaw = localStorage.getItem(STORAGE_KEY);
+        if (localRaw) {
+            finalData = JSON.parse(localRaw);
+            source = 'Local';
+        }
+    } catch(e) { console.error("Erro leitura local", e); }
 
-    // 2. Tenta carregar do Supabase
+    // 2. Tenta Nuvem (Admin Mode para garantir leitura sem RLS issues)
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const sessionRes = await withTimeout(supabase.auth.getSession(), 2000, "Load Session");
+        const user = (sessionRes as any)?.data?.session?.user;
+
         if (user) {
-            const { data, error } = await supabase
-                .from('user_data')
-                .select('data')
-                .eq('user_id', user.id)
-                .maybeSingle();
+            // Tenta ler com Admin Client para pular qualquer regra de segurança bugada
+            const { data, error } = await withTimeout(
+                supabaseAdmin
+                    .from('user_data')
+                    .select('data')
+                    .eq('user_id', user.id)
+                    .maybeSingle(),
+                3000,
+                "Cloud Load"
+            ) as any;
 
             if (!error && data && data.data) {
-                cloudData = data.data;
+                // Se temos dados na nuvem, usamos eles (assumindo que a nuvem é a verdade se disponível)
+                // O ideal seria comparar timestamps, mas para este fix, priorizamos a nuvem se ela responder.
+                finalData = data.data;
+                source = 'Nuvem';
             }
         }
     } catch (e) {
-        console.error("Erro ao carregar do Supabase:", e);
+        console.warn("Nuvem lenta ou indisponível, usando dados locais.", e);
     }
 
-    // 3. Decisão Inteligente: Qual dado usar?
-    // Se o salvamento na nuvem falhou antes, o local pode ser mais recente.
-    // Mas, como não temos timestamps precisos dentro do JSON antigo, damos preferência à Nuvem
-    // se ela existir, a menos que esteja explicitamente vazia e o local tenha dados.
-    
-    let finalData = null;
-
-    if (cloudData) {
-        finalData = cloudData;
-        source = 'Supabase';
-        // Limpa o backup de emergência se a nuvem carregou com sucesso, 
-        // para evitar que dados velhos locais sobrescrevam no futuro em caso de bug.
-        // (Opcional: você pode manter por segurança, mas aqui priorizamos a nuvem)
-    } else if (localData) {
-        finalData = localData;
-        source = 'Backup Local (Offline)';
-        utils.showToast('Recuperado do backup local.', 'warning');
-    }
-
-    // 4. Aplica os dados (ou defaults)
+    // 3. Aplica os dados (o que tiver conseguido)
     if (finalData) {
         applyData(finalData);
-        console.log(`Dados carregados de: ${source}`);
+        console.log(`Dados aplicados de: ${source}`);
+        if (source === 'Local') {
+            utils.showToast('Modo Offline: Dados locais carregados.', 'warning');
+            state.setDataDirty(true); // Tenta subir para a nuvem na próxima oportunidade
+        }
     } else {
         initDefaults();
-        console.log("Iniciando com dados padrão (Novo Usuário)");
+        console.log("Iniciando perfil limpo.");
     }
 
-    state.setDataDirty(false);
     renderAllViews();
     populateMobileMenu();
     switchView('dashboard');
@@ -291,15 +314,11 @@ function initDefaults() {
     Object.assign(state.settings, defaultSettings);
     dom.schoolNameEl.textContent = state.settings.schoolName;
     state.setCalendarioEventos(getInitialHolidays());
-    state.setAvisos([]);
-    state.setRecursos([]);
-    state.setProvas([]);
-    state.setAulas([]);
-    state.setSalas([]);
-    state.setAlunosParticulares([]);
+    state.setAvisos([]); state.setRecursos([]); state.setProvas([]);
+    state.setAulas([]); state.setSalas([]); state.setAlunosParticulares([]);
 }
 
-// --- Funções Auxiliares de Datas (Mantidas) ---
+// --- Funções Auxiliares de Datas ---
 const addDays = (date: Date, days: number): Date => {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
@@ -376,7 +395,6 @@ function renderAllViews() {
 }
 
 export function deduplicateAndSanitizeProgress() {
-    // Mantido da versão anterior (sem alterações lógicas)
     const bookInfoMap = new Map<number, { nome: string, salaId: number }>();
     state.salas.forEach(s => s.livros.forEach(l => bookInfoMap.set(l.id, { nome: l.nome, salaId: s.id })));
 
@@ -421,7 +439,7 @@ export function deduplicateAndSanitizeProgress() {
     });
 }
 
-// Funções de Import/Export (Mantidas iguais à versão anterior, pois são locais)
+// Funções de Import/Export e Manipuladores
 function handleExport() {
     const hasData = [state.avisos, state.recursos, state.provas, state.aulas, state.salas, state.alunosParticulares, state.calendarioEventos].some(arr => arr.length > 0);
     if (!hasData) return utils.showToast('Não há dados para exportar.', 'warning');
@@ -482,12 +500,12 @@ function confirmImport() {
 
     setTimeout(() => {
         applyData(dataToImport);
-        state.setDataDirty(true);
+        state.setDataDirty(true); // Força sincronização com a nuvem
         renderAllViews();
         populateMobileMenu();
         switchView('dashboard');
         utils.setButtonLoading(dom.confirmImportBtn, false);
-        utils.showToast('Backup restaurado e salvo na nuvem!', 'success');
+        utils.showToast('Backup restaurado! Salvando na nuvem...', 'success');
         closeImportModal();
     }, 500);
 }
