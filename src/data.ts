@@ -40,7 +40,7 @@ let saveTimeout: any = null; // Timer para o debounce
  * Usa um timer (debounce) para esperar o usuário parar de digitar antes de salvar.
  */
 export function triggerAutoSave() {
-    // Cancela o timer anterior se houver (o usuário ainda está digitando/clicando)
+    // Cancela o timer anterior se houver
     if (saveTimeout) {
         clearTimeout(saveTimeout);
     }
@@ -55,25 +55,20 @@ export function triggerAutoSave() {
 
 /**
  * Salva o estado atual da aplicação na tabela 'user_data' do Supabase.
- * IMPLEMENTAÇÃO BLINDADA COM FAILCHECKS E FAILSAFES.
+ * SOLUÇÃO DEFINITIVA V3: Timeout Rígido + Finally Block
  */
 async function saveToSupabase() {
-    // FAILCHECK 1: Verificação de Conectividade
-    // Se o navegador estiver offline, nem tenta conectar.
+    // 1. Failcheck de Rede
     if (!navigator.onLine) {
-        console.warn("Auto-save abortado: Sem conexão com a internet.");
-        utils.showToast("Sem internet. Dados serão salvos localmente até a conexão voltar.", "warning");
+        console.warn("Auto-save: Sem internet.");
         state.setIsSaving(false);
         return;
     }
 
-    // FAILCHECK 2: Verificação de Sessão Ativa e Token
-    // Verifica se existe uma sessão válida antes de tentar montar o payload.
+    // 2. Failcheck de Sessão
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
     if (sessionError || !session || !session.user) {
-        console.warn("Auto-save abortado: Sessão inválida ou expirada.");
-        // Não mostramos erro visual para não interromper o fluxo, mas paramos o spinner.
+        console.warn("Auto-save: Sessão inválida.");
         state.setIsSaving(false);
         return;
     }
@@ -81,7 +76,6 @@ async function saveToSupabase() {
     try {
         const user = session.user;
 
-        // Monta o objeto JSON completo
         const appData = { 
             settings: state.settings,
             avisos: state.avisos, 
@@ -93,13 +87,13 @@ async function saveToSupabase() {
             calendarioEventos: state.calendarioEventos,
         };
 
-        // FAILSAFE 1: Timeout de Segurança (Race Condition)
-        // Se o Supabase demorar mais de 15s (ex: banco travado), forçamos um erro para liberar a UI.
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("TIMEOUT_ERROR")), 15000)
+        // 3. FAILSAFE: Timeout Rígido de 5 segundos
+        // Se o Supabase não responder em 5s, rejeitamos a promessa para destravar a UI.
+        const timeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("TIMEOUT_5S")), 5000)
         );
 
-        const databasePromise = supabase
+        const request = supabase
             .from('user_data')
             .upsert({ 
                 user_id: user.id, 
@@ -107,40 +101,30 @@ async function saveToSupabase() {
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
-        // Competição: Quem terminar primeiro ganha. Se o timeout ganhar, cai no catch.
-        const result = await Promise.race([databasePromise, timeoutPromise]) as any;
-        
+        // Race: Quem chegar primeiro ganha (O sucesso ou o erro de timeout)
+        const result = await Promise.race([request, timeout]) as any;
+
         if (result && result.error) throw result.error;
 
-        // Sucesso: Limpa a flag de "sujo"
+        // Sucesso
         state.setDataDirty(false); 
-        
-        // Feedback visual de sucesso no console para debug
-        console.log("Auto-save concluído com sucesso.");
+        console.log("Salvo com sucesso no Supabase.");
 
     } catch (err: any) {
-        console.error("Erro CRÍTICO no Auto-Save:", err);
+        console.error("Erro no Auto-Save:", err);
         
         const saveStatusEl = document.getElementById('save-status');
         if (saveStatusEl) {
             let msg = "Erro ao salvar";
             
-            // Diagnóstico específico para o erro de coluna (schema errado)
-            if (err.code === '42703' || (err.message && err.message.includes('column'))) {
-                msg = "Erro de Banco (SQL)";
-                utils.showToast("Erro crítico: Banco de dados desatualizado. Rode o script SQL no Supabase.", "error");
-            } 
-            else if (err.message === "TIMEOUT_ERROR") {
-                msg = "Conexão lenta";
-            }
-            
+            if (err.message === "TIMEOUT_5S") msg = "Lentidão na rede";
+            else if (err.code === "PGRST301" || err.code === "42501") msg = "Erro de Permissão (SQL)";
+            else if (err.message && err.message.includes("fetch")) msg = "Falha de conexão";
+
             saveStatusEl.innerHTML = `<span style="color: var(--error-color)">⚠ ${msg}</span>`;
         }
-        
     } finally {
-        // FAILSAFE 2: O Bloco Finally
-        // Garante que o spinner pare ABSOLUTAMENTE SEMPRE, independente de sucesso ou erro.
-        // Isso impede o "giro eterno".
+        // 4. FAILSAFE FINAL: Isso roda 100% das vezes, parando o spinner.
         state.setIsSaving(false);
     }
 }
@@ -160,9 +144,7 @@ async function loadFromSupabase() {
             .single();
 
         if (error) {
-            // PGRST116 é "row not found", normal para novos usuários
-            if (error.code === 'PGRST116') return false;
-            
+            if (error.code === 'PGRST116') return false; // Usuário novo
             console.error("Erro ao carregar dados:", error);
             return false;
         }
@@ -170,7 +152,6 @@ async function loadFromSupabase() {
         if (data && data.data) {
             const savedData = data.data;
             
-            // Popula Settings
             const defaultSettings = { 
                 teacherName: 'Paulo Gabriel de L. S.', 
                 schoolName: 'Microcamp Mogi das Cruzes', 
@@ -180,7 +161,6 @@ async function loadFromSupabase() {
             Object.assign(state.settings, defaultSettings, savedData.settings || {});
             dom.schoolNameEl.textContent = state.settings.schoolName;
 
-            // Popula Arrays com verificação de nulos
             state.setAvisos(savedData.avisos || []);
             state.setRecursos(savedData.recursos || []);
             state.setProvas(savedData.provas || []);
@@ -192,12 +172,9 @@ async function loadFromSupabase() {
             state.setCalendarioEventos(savedData.calendarioEventos || feriados);
 
             deduplicateAndSanitizeProgress();
-            
             return true;
         } 
-        
         return false;
-
     } catch (err) {
         console.error("Falha crítica no carregamento:", err);
         return false;
