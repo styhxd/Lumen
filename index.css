@@ -1,3 +1,4 @@
+
 /*
  * =================================================================================
  * LÚMEN - FOLHA DE ESTILO PRINCIPAL (index.css)
@@ -103,6 +104,67 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh; /* Garante que o footer fique no final da página, mesmo com pouco conteúdo. */
+}
+
+/*
+ * =================================================================================
+ * AUTHENTICATION SCREEN
+ * =================================================================================
+ */
+.auth-container {
+    display: none; /* Hidden by default via JS */
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 1rem;
+    position: relative;
+    z-index: 10;
+}
+
+.auth-card {
+    background: var(--bg-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border-color);
+    border-radius: 2rem;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.auth-header {
+    margin-bottom: 2rem;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    text-align: left;
+}
+
+.auth-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.main-container {
+    opacity: 0;
+    transition: opacity 0.5s ease-in;
+}
+
+.main-container.visible {
+    opacity: 1;
 }
 
 /*
