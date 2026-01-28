@@ -55,13 +55,33 @@ export function triggerAutoSave() {
 
 /**
  * Salva o estado atual da aplicação na tabela 'user_data' do Supabase.
+ * IMPLEMENTAÇÃO BLINDADA COM FAILCHECKS E FAILSAFES.
  */
 async function saveToSupabase() {
-    try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return; // Não salva se não estiver logado
+    // FAILCHECK 1: Verificação de Conectividade
+    // Se o navegador estiver offline, nem tenta conectar.
+    if (!navigator.onLine) {
+        console.warn("Auto-save abortado: Sem conexão com a internet.");
+        utils.showToast("Sem internet. Dados serão salvos localmente até a conexão voltar.", "warning");
+        state.setIsSaving(false);
+        return;
+    }
 
-        // Monta o objeto JSON completo (mesma estrutura do export)
+    // FAILCHECK 2: Verificação de Sessão Ativa e Token
+    // Verifica se existe uma sessão válida antes de tentar montar o payload.
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session || !session.user) {
+        console.warn("Auto-save abortado: Sessão inválida ou expirada.");
+        // Não mostramos erro visual para não interromper o fluxo, mas paramos o spinner.
+        state.setIsSaving(false);
+        return;
+    }
+
+    try {
+        const user = session.user;
+
+        // Monta o objeto JSON completo
         const appData = { 
             settings: state.settings,
             avisos: state.avisos, 
@@ -73,8 +93,13 @@ async function saveToSupabase() {
             calendarioEventos: state.calendarioEventos,
         };
 
-        // Upsert: Insere ou Atualiza baseado no user_id (que é unique na tabela)
-        const { error } = await supabase
+        // FAILSAFE 1: Timeout de Segurança (Race Condition)
+        // Se o Supabase demorar mais de 15s (ex: banco travado), forçamos um erro para liberar a UI.
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("TIMEOUT_ERROR")), 15000)
+        );
+
+        const databasePromise = supabase
             .from('user_data')
             .upsert({ 
                 user_id: user.id, 
@@ -82,17 +107,41 @@ async function saveToSupabase() {
                 updated_at: new Date().toISOString()
             }, { onConflict: 'user_id' });
 
-        if (error) throw error;
+        // Competição: Quem terminar primeiro ganha. Se o timeout ganhar, cai no catch.
+        const result = await Promise.race([databasePromise, timeoutPromise]) as any;
+        
+        if (result && result.error) throw result.error;
 
-        // Sucesso
+        // Sucesso: Limpa a flag de "sujo"
+        state.setDataDirty(false); 
+        
+        // Feedback visual de sucesso no console para debug
+        console.log("Auto-save concluído com sucesso.");
+
+    } catch (err: any) {
+        console.error("Erro CRÍTICO no Auto-Save:", err);
+        
+        const saveStatusEl = document.getElementById('save-status');
+        if (saveStatusEl) {
+            let msg = "Erro ao salvar";
+            
+            // Diagnóstico específico para o erro de coluna (schema errado)
+            if (err.code === '42703' || (err.message && err.message.includes('column'))) {
+                msg = "Erro de Banco (SQL)";
+                utils.showToast("Erro crítico: Banco de dados desatualizado. Rode o script SQL no Supabase.", "error");
+            } 
+            else if (err.message === "TIMEOUT_ERROR") {
+                msg = "Conexão lenta";
+            }
+            
+            saveStatusEl.innerHTML = `<span style="color: var(--error-color)">⚠ ${msg}</span>`;
+        }
+        
+    } finally {
+        // FAILSAFE 2: O Bloco Finally
+        // Garante que o spinner pare ABSOLUTAMENTE SEMPRE, independente de sucesso ou erro.
+        // Isso impede o "giro eterno".
         state.setIsSaving(false);
-        state.setDataDirty(false); // Reseta a flag de "sujo"
-        // console.log("Auto-save concluído com sucesso.");
-
-    } catch (err) {
-        console.error("Erro no Auto-Save:", err);
-        state.setIsSaving(false); // Para o spinner
-        utils.showToast("Falha ao salvar na nuvem. Verifique sua conexão.", "error");
     }
 }
 
@@ -110,13 +159,15 @@ async function loadFromSupabase() {
             .eq('user_id', user.id)
             .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 é "row not found", que é normal no primeiro login
+        if (error) {
+            // PGRST116 é "row not found", normal para novos usuários
+            if (error.code === 'PGRST116') return false;
+            
             console.error("Erro ao carregar dados:", error);
             return false;
         }
 
         if (data && data.data) {
-            // Dados encontrados! Vamos popular o estado.
             const savedData = data.data;
             
             // Popula Settings
@@ -129,7 +180,7 @@ async function loadFromSupabase() {
             Object.assign(state.settings, defaultSettings, savedData.settings || {});
             dom.schoolNameEl.textContent = state.settings.schoolName;
 
-            // Popula Arrays (com segurança contra null)
+            // Popula Arrays com verificação de nulos
             state.setAvisos(savedData.avisos || []);
             state.setRecursos(savedData.recursos || []);
             state.setProvas(savedData.provas || []);
@@ -137,17 +188,15 @@ async function loadFromSupabase() {
             state.setSalas(savedData.salas || []);
             state.setAlunosParticulares(savedData.alunosParticulares || []);
             
-            // Calendário com fallback
             const feriados = getInitialHolidays();
             state.setCalendarioEventos(savedData.calendarioEventos || feriados);
 
-            // Sanitização para garantir integridade
             deduplicateAndSanitizeProgress();
             
             return true;
         } 
         
-        return false; // Nenhum dado salvo ainda (primeiro uso)
+        return false;
 
     } catch (err) {
         console.error("Falha crítica no carregamento:", err);
