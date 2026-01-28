@@ -43,12 +43,15 @@ function calculateMonthlyFinancials(monthYear: string) {
     const aulasDoMes = state.aulas.filter(a => a.chamadaRealizada && !a.isNoClassEvent && a.date.startsWith(monthYear));
     
     const distinctStudents = new Set<number>();
+    // Mapa auxiliar para garantir que temos o nome do aluno mesmo se ele não estiver mais na sala original (caso de transferência)
+    const studentInfoMap = new Map<number, { name: string, sala: string }>();
     
     // CORREÇÃO CRÍTICA: Lógica de Elegibilidade
     effectivelyActiveSalas.forEach(s => s.alunos.forEach(a => {
         // Cenário 1: O aluno tem um status "bom" hoje.
         if (activeStudentStatuses.includes(a.statusMatricula)) {
             distinctStudents.add(a.id);
+            studentInfoMap.set(a.id, { name: a.nomeCompleto, sala: s.nome });
         } 
         // Cenário 2: O aluno foi Excluído/Desistente HOJE, mas ESTAVA LÁ no mês do cálculo.
         // Verificamos se ele teve pelo menos 1 presença em qualquer aula do mês.
@@ -56,6 +59,7 @@ function calculateMonthlyFinancials(monthYear: string) {
             const tevePresencaNoMes = aulasDoMes.some(aula => aula.turma === s.nome && aula.presentes.includes(a.id));
             if (tevePresencaNoMes) {
                 distinctStudents.add(a.id);
+                studentInfoMap.set(a.id, { name: a.nomeCompleto, sala: s.nome });
             }
         }
     }));
@@ -76,19 +80,32 @@ function calculateMonthlyFinancials(monthYear: string) {
     distinctStudents.forEach(studentId => {
         let isFrequent = false;
         let maxFreq = 0;
-        let studentName = '';
-        let salaName = '';
+        
+        // Recupera informações básicas do mapa (fallback caso o aluno tenha sido transferido e não esteja na sala iterada)
+        let studentName = studentInfoMap.get(studentId)?.name || '';
+        let salaName = studentInfoMap.get(studentId)?.sala || '';
         
         // Variáveis temporárias para guardar o status do "livro" com melhor desempenho (ou que botou no radar)
         let currentBestStats = { missing: 0, present: 0, total: 0 };
 
         for (const sala of effectivelyActiveSalas) {
+            // Tenta encontrar o aluno na sala atual
             const alunoRef = sala.alunos.find(a => a.id === studentId);
-            if (!alunoRef) continue;
-            studentName = alunoRef.nomeCompleto;
-            salaName = sala.nome;
-
+            
+            // Busca aulas desta sala neste mês
             const aulasDaSalaNoMes = aulasDoMes.filter(a => a.turma === sala.nome);
+
+            // CORREÇÃO DE TRANSFERÊNCIA:
+            // Se o aluno não está na lista da sala E não tem aulas nessa sala no mês, pula.
+            // Mas se ele NÃO está na lista (foi transferido), mas TEM aulas (era dessa turma no mês passado), PROCESSA.
+            if (!alunoRef && aulasDaSalaNoMes.length === 0) continue;
+
+            // Se encontrou o aluno na lista atual, atualiza o nome/sala para o mais recente
+            if (alunoRef) {
+                studentName = alunoRef.nomeCompleto;
+                salaName = sala.nome;
+            }
+
             if (aulasDaSalaNoMes.length === 0) continue;
 
             const aulasPorLivro: Record<string, Aula[]> = {};
