@@ -1,4 +1,6 @@
 
+
+
 <!DOCTYPE html>
 <!-- 
   ================================================================================
@@ -36,7 +38,8 @@
   "imports": {
     "vite": "https://esm.sh/vite@^7.3.1",
     "path": "https://esm.sh/path@^0.12.7",
-    "url": "https://esm.sh/url@^0.11.4"
+    "url": "https://esm.sh/url@^0.11.4",
+    "firebase/": "https://esm.sh/firebase@^12.8.0/"
   }
 }
 </script>
@@ -72,9 +75,15 @@
             <!-- Navegação para Desktop -->
             <div class="desktop-header-grid">
                 <div class="header-brand-section">
-                    <button id="lumen-brand-btn" data-view="dashboard" class="btn btn-large lumen-brand">
-                        <span class="btn-text">Lumen <span style="font-size: 0.5em; opacity: 0.5; vertical-align: text-top; font-weight: 400;">v2.23</span></span>
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button id="lumen-brand-btn" data-view="dashboard" class="btn btn-large lumen-brand">
+                            <span class="btn-text">Lumen <span style="font-size: 0.5em; opacity: 0.5; vertical-align: text-top; font-weight: 400;">v2.23</span></span>
+                        </button>
+                        <!-- Cloud Status Icon -->
+                        <div id="cloud-status-icon" title="Status da Nuvem" style="display: flex; align-items: center; padding: 0.5rem;">
+                            <!-- Icon injected via JS -->
+                        </div>
+                    </div>
                     <span id="school-name">Microcamp Mogi das Cruzes</span>
                 </div>
                 <div class="header-left-middle">
@@ -331,15 +340,28 @@
           final da área de conteúdo.
         -->
         <div class="bottom-action-bar">
-             <button id="import-btn" class="btn btn-large">
-                <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span class="btn-text">Importar JSON</span>
-                <div class="spinner"></div>
-             </button>
-             <button id="export-btn" class="btn btn-large">
-                <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                <span class="btn-text">Exportar JSON</span>
-             </button>
+            <!-- Grupo Esquerda: Import/Export -->
+            <div class="data-actions-group" style="display: flex; gap: 1rem;">
+                 <button id="import-btn" class="btn btn-large">
+                    <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span class="btn-text">Importar JSON</span>
+                    <div class="spinner"></div>
+                 </button>
+                 <button id="export-btn" class="btn btn-large">
+                    <svg class="btn-icon-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span class="btn-text">Exportar JSON</span>
+                 </button>
+            </div>
+
+            <!-- Grupo Direita: Informações do Usuário e Status -->
+            <div class="user-info-bar">
+                <span id="cloud-save-status" class="status-text"></span>
+                <span id="current-user-email" class="user-email-display">Não logado</span>
+                <button id="footer-logout-btn" class="btn btn-medium logout-btn-footer">
+                    <svg class="btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    <span class="btn-text">Sair</span>
+                </button>
+            </div>
         </div>
     </div>
     
@@ -356,6 +378,37 @@
             <svg class="drag-drop-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
             <h2>Arraste o arquivo JSON aqui</h2>
             <p>Solte para iniciar a importação</p>
+        </div>
+    </div>
+
+    <!-- 
+      TELA DE LOGIN / BLOQUEIO (LOCK SCREEN)
+      Esta interface sobrepõe todo o conteúdo até que o usuário seja autenticado.
+      Utiliza glassmorphism e design limpo para uma boa primeira impressão.
+    -->
+    <div id="login-screen">
+        <div class="login-card">
+            <h1 class="login-title">Lumen</h1>
+            <p class="login-subtitle">Acesso Restrito</p>
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="login-email" style="text-align: left;">E-mail</label>
+                    <input type="email" id="login-email" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="login-password" style="text-align: left;">Senha</label>
+                    <input type="password" id="login-password" required autocomplete="current-password">
+                </div>
+                <button type="submit" id="login-btn" class="btn btn-primary btn-large" style="margin-top: 1rem;">
+                    <span class="btn-text">Entrar</span>
+                    <div class="spinner"></div>
+                </button>
+            </form>
+            <div style="margin-top: 1.5rem; text-align: center;">
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                    <a href="#" id="toggle-auth" style="color: var(--primary-blue); text-decoration: none;">Não tem conta? Cadastre-se</a>
+                </p>
+            </div>
         </div>
     </div>
 
@@ -708,11 +761,11 @@
     <div id="import-confirm-modal" class="modal-backdrop">
         <div class="modal-content" style="max-width: 500px;">
             <h2 class="view-title">Confirmar Importação</h2>
-            <p>Tem certeza de que deseja importar este arquivo? Todos os dados atuais (avisos, recursos, provas, aulas, nome da escola, etc.) serão substituídos. Esta ação não pode ser desfeita.</p>
+            <p>Tem certeza de que deseja importar este arquivo? Todos os dados atuais serão substituídos e <strong>sincronizados automaticamente com a nuvem</strong>.</p>
             <div class="modal-actions">
                 <button type="button" id="cancel-import-btn" class="btn">Cancelar</button>
                 <button type="button" id="confirm-import-btn" class="btn btn-primary">
-                    <span class="btn-text">Importar</span>
+                    <span class="btn-text">Importar e Salvar</span>
                     <div class="spinner"></div>
                 </button>
             </div>
@@ -1097,12 +1150,14 @@
                         <input type="number" id="setting-valor-hora-aula" step="0.01" min="0" required>
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button type="button" id="settings-cancel-btn" class="btn">Cancelar</button>
-                    <button type="submit" id="settings-save-btn" class="btn btn-primary">
-                        <span class="btn-text">Salvar Configurações</span>
-                        <div class="spinner"></div>
-                    </button>
+                <div class="modal-actions" style="justify-content: flex-end;">
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button type="button" id="settings-cancel-btn" class="btn">Cancelar</button>
+                        <button type="submit" id="settings-save-btn" class="btn btn-primary">
+                            <span class="btn-text">Salvar Configurações</span>
+                            <div class="spinner"></div>
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>

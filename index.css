@@ -1,3 +1,6 @@
+
+
+
 /*
  * =================================================================================
  * LÚMEN - FOLHA DE ESTILO PRINCIPAL (index.css)
@@ -179,6 +182,77 @@ body {
 
 /*
  * =================================================================================
+ * LOGIN / LOCK SCREEN
+ * =================================================================================
+ * Estilos para a tela de bloqueio que sobrepõe todo o conteúdo até o login.
+ */
+#login-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(10, 15, 31, 0.85); /* Fundo escuro com leve transparência */
+    backdrop-filter: blur(15px); /* Efeito Glassmorphism forte */
+    -webkit-backdrop-filter: blur(15px);
+    z-index: 9999; /* Garante que fique sobre tudo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease-in-out;
+}
+
+#login-screen.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.login-card {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    padding: 2.5rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-blue), var(--success-color));
+}
+
+.login-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+    margin-bottom: 0.5rem;
+}
+
+.login-subtitle {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/*
+ * =================================================================================
  * LAYOUT PRINCIPAL E COMPONENTES ESTRUTURAIS
  * =================================================================================
  * Estilos para os blocos de construção da página: container, header, main e footer.
@@ -264,10 +338,64 @@ header.main-header {
     margin-top: 1.5rem; padding: 1rem; background: var(--bg-glass);
     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-color); border-radius: 1.5rem;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); display: flex;
-    gap: 1rem; justify-content: center;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1); 
+    display: flex;
+    flex-wrap: wrap; /* Permite quebrar linha em telas menores */
+    align-items: center;
+    justify-content: space-between; /* Separa os botões da esquerda da info da direita */
+    gap: 1rem; 
 }
-.bottom-action-bar .btn { flex-grow: 1; max-width: 350px; }
+
+.bottom-action-bar .data-actions-group {
+    display: flex;
+    gap: 1rem;
+    flex-grow: 1; /* Ocupa espaço para empurrar o grupo direito */
+}
+
+/* User Info Bar Styling */
+.user-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.status-text {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-text.saving { color: var(--warning-color); }
+.status-text.saved { color: var(--success-color); }
+.status-text.error { color: var(--error-color); }
+
+.user-email-display {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    font-weight: 500;
+    padding-right: 0.5rem;
+    border-right: 1px solid var(--border-color);
+}
+
+.logout-btn-footer {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--error-color);
+    border: 1px solid var(--error-color);
+}
+
+.logout-btn-footer:hover {
+    background-color: var(--error-color);
+    color: #fff;
+}
 
 footer { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); font-size: 0.8rem; }
 
@@ -1902,7 +2030,10 @@ html[data-theme='light'] .event-tag {
     /* Layout totalmente mobile: cabeçalho com menu hamburger, botões em coluna. */
     .desktop-header-grid { display: none; }
     .mobile-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; width: 100%; }
-    .bottom-action-bar { flex-direction: column; }
+    .bottom-action-bar { flex-direction: column; align-items: stretch; }
+    .bottom-action-bar .data-actions-group { flex-direction: column; width: 100%; }
+    .user-info-bar { flex-direction: column; text-align: center; width: 100%; }
+    .user-email-display { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; width: 100%; }
     
     .view-header {
         flex-direction: column;

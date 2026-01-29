@@ -1,3 +1,4 @@
+
 /*
  * =================================================================================
  * PONTO DE ENTRADA PRINCIPAL DA APLICAÇÃO (index.tsx)
@@ -28,6 +29,7 @@
 import { initUI, switchView, populateMobileMenu } from './src/ui.ts';
 import { loadAllData, initDataHandlers } from './src/data.ts';
 import { initModals, handleDeleteClick, handleFinalizeClick } from './src/modals.ts';
+import { initAuth } from './src/auth.ts'; // Importa o inicializador de autenticação
 
 // Módulos de cada View (tela) da aplicação
 import { initAlunos, openSalaModal, openLivroModal, openAlunoModal, setAlunosViewState, renderAlunosView, renderSalasFinalizadasList, renderAlunosExcluidosList } from './src/views/alunos.ts';
@@ -67,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return event.returnValue;
         }
     });
+
+    // Inicializa a autenticação (Bloqueia a UI até o login)
+    initAuth();
 
     // Inicializa os sistemas centrais da aplicação.
     initUI();

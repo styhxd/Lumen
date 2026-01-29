@@ -1,3 +1,4 @@
+
 /*
  * =================================================================================
  * MÓDULO DE SELETORES DO DOM (src/dom.ts)
@@ -40,6 +41,26 @@ export const mobileNav = document.querySelector('.mobile-nav') as HTMLElement;
 export const hamburgerMenu = document.querySelector('.hamburger-menu') as HTMLElement;
 export const toastContainer = document.getElementById('toast-container') as HTMLElement;
 export const mainElement = document.querySelector('main') as HTMLElement;
+export const cloudStatusIcon = document.getElementById('cloud-status-icon') as HTMLElement; // Novo ícone de status
+
+// =================================================================================
+// ELEMENTOS DO RODAPÉ (USER INFO & STATUS)
+// =================================================================================
+export const currentUserEmail = document.getElementById('current-user-email') as HTMLElement;
+export const cloudSaveStatus = document.getElementById('cloud-save-status') as HTMLElement;
+export const footerLogoutBtn = document.getElementById('footer-logout-btn') as HTMLButtonElement;
+
+// =================================================================================
+// ELEMENTOS DE AUTENTICAÇÃO (LOGIN / LOCK SCREEN)
+// =================================================================================
+export const loginScreen = document.getElementById('login-screen') as HTMLElement;
+export const loginForm = document.getElementById('login-form') as HTMLFormElement;
+export const loginEmailInput = document.getElementById('login-email') as HTMLInputElement;
+export const loginPasswordInput = document.getElementById('login-password') as HTMLInputElement;
+export const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
+export const loginTitle = document.querySelector('.login-title') as HTMLElement;
+export const toggleAuthBtn = document.getElementById('toggle-auth') as HTMLElement;
+
 
 // =================================================================================
 // CONTÊINERES DE CONTEÚDO (VIEWS)

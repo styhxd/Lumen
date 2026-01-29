@@ -1,3 +1,4 @@
+
 /*
  * =================================================================================
  * MÓDULO DE ESTADO GLOBAL (src/state.ts)
@@ -47,6 +48,14 @@ export let calendarioEventos: CalendarioEvento[] = [];
  * prevenindo a perda de alterações não salvas.
  */
 export let isDataDirty = false;
+
+// Sistema de Observadores para Data Dirty
+type DirtyListener = (isDirty: boolean) => void;
+const dirtyListeners: DirtyListener[] = [];
+
+export function subscribeToDirtyState(listener: DirtyListener) {
+    dirtyListeners.push(listener);
+}
 
 // =================================================================================
 // CONFIGURAÇÕES GLOBAIS
@@ -109,6 +118,8 @@ export function setActiveProvaCategory(newCategory: string) {
 
 export function setDataDirty(value: boolean) {
     isDataDirty = value;
+    // Notifica todos os observadores sobre a mudança
+    dirtyListeners.forEach(listener => listener(value));
 }
 
 /**

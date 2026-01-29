@@ -1,3 +1,4 @@
+
 /*
  * =================================================================================
  * MÓDULO DE GERENCIAMENTO DE DADOS (src/data.ts)
@@ -9,6 +10,7 @@
  * - Funções de importação e exportação de dados via arquivos JSON.
  * - Lógica de arrastar e soltar (Drag and Drop) para importação.
  * - Validação e processamento de arquivos importados.
+ * - PERSISTÊNCIA NA NUVEM (FIRESTORE) E AUTOSAVE.
  * A centralização dessas responsabilidades garante consistência e facilita a
  * manutenção e a depuração de tudo que envolve a persistência de dados.
  * =================================================================================
@@ -27,6 +29,8 @@ import * as dom from './dom.ts';            // Seletores de elementos do DOM par
 import * as utils from './utils.ts';        // Funções utilitárias, como exibir toasts e controlar o estado de loading de botões.
 import { populateMobileMenu, switchView } from './ui.ts'; // Funções para atualizar componentes específicos da UI.
 import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso } from './types.ts';     // Tipos de dados para garantir a consistência.
+import { db, auth } from './firebase.ts';   // Importação do Firestore e Auth
+import { doc, getDoc, setDoc } from "firebase/firestore"; // Funções do Firestore
 
 // Importamos TODAS as funções de renderização das views. Isso é crucial para que,
 // após uma grande alteração nos dados (como uma importação), possamos
@@ -45,6 +49,11 @@ import { renderReportsView } from './views/reports.ts';
 // Variável temporária para armazenar os dados do arquivo JSON antes da confirmação final do usuário.
 // Isso evita a substituição acidental dos dados atuais.
 let dataToImport: any = null;
+
+// Variáveis para o Autosave
+let autosaveTimeout: any = null;
+const AUTOSAVE_DELAY = 5000; // 5 segundos
+let isAutosaveDisabled = false; // Flag de segurança para erros críticos
 
 /**
  * =================================================================================
@@ -347,6 +356,142 @@ export function loadAllData() {
 };
 
 /**
+ * Helper para atualizar o texto de status na barra inferior.
+ */
+function updateStatus(text: string, type: 'saving' | 'saved' | 'error' | 'normal' = 'normal') {
+    dom.cloudSaveStatus.textContent = text;
+    dom.cloudSaveStatus.className = `status-text ${type}`;
+    
+    if (type === 'saving') {
+        // Adiciona um pequeno spinner SVG
+        dom.cloudSaveStatus.innerHTML = `
+            <svg class="spinner" viewBox="0 0 50 50" style="width: 14px; height: 14px; position: static; display: inline-block; margin-right: 5px;">
+                <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="5"></circle>
+            </svg> 
+            ${text}
+        `;
+    }
+}
+
+/**
+ * Salva todos os dados atuais na nuvem (Firestore).
+ */
+export async function saveToCloud() {
+    // Se o autosave estiver desativado, tentamos reativar para uma operação manual
+    // Mas se foi bloqueado por permissão, evitamos.
+    if (isAutosaveDisabled && !auth.currentUser) {
+        console.warn("Autosave: Desativado ou nenhum usuário logado.");
+        return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) {
+        console.warn("Autosave: Nenhum usuário logado.");
+        return;
+    }
+
+    try {
+        updateStatus("Sincronizando...", "saving");
+        
+        dom.cloudStatusIcon.innerHTML = `<div class="spinner" style="display:block; width:16px; height:16px; border-width:2px;"></div>`;
+        dom.cloudStatusIcon.title = "Salvando na nuvem...";
+
+        const exportData = { 
+            lastUpdated: new Date().toISOString(), 
+            data: { 
+                settings: state.settings,
+                avisos: state.avisos, 
+                recursos: state.recursos, 
+                provas: state.provas, 
+                aulas: state.aulas, 
+                salas: state.salas, 
+                alunosParticulares: state.alunosParticulares, 
+                calendarioEventos: state.calendarioEventos,
+            } 
+        };
+
+        await setDoc(doc(db, "schools", user.uid), exportData);
+        
+        state.setDataDirty(false);
+        updateStatus("Salvo na nuvem", "saved");
+        console.log("Autosave: Sucesso.");
+        
+        dom.cloudStatusIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="var(--success-color)" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+        dom.cloudStatusIcon.title = "Salvo na nuvem";
+
+    } catch (error: any) {
+        console.error("Autosave: Erro ao salvar.", error);
+        updateStatus("Erro ao salvar", "error");
+        
+        // Se for erro de permissão, exibe um alerta específico e desativa o autosave
+        if (error.code === 'permission-denied') {
+            utils.showToast("Erro: Permissão negada no Firebase. Verifique as Regras do Firestore.", "error");
+            isAutosaveDisabled = true;
+        } else {
+            utils.showToast(`Erro ao salvar na nuvem: ${error.message || "Erro desconhecido"}`, "error");
+        }
+
+        dom.cloudStatusIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="var(--error-color)" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`;
+        dom.cloudStatusIcon.title = "Erro ao salvar";
+    }
+}
+
+/**
+ * Carrega os dados da nuvem (Firestore) e atualiza o estado da aplicação.
+ */
+export async function loadFromCloud(uid: string) {
+    try {
+        updateStatus("Carregando dados...", "saving");
+        const docRef = doc(db, "schools", uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const savedData = docSnap.data();
+            dataToImport = savedData.data; // Usa a mesma estrutura da importação de arquivo
+            confirmImport(true); // true indica que é carregamento da nuvem (não força um save imediato)
+            console.log("Cloud Load: Sucesso.");
+            updateStatus("Dados carregados", "saved");
+        } else {
+            console.log("Cloud Load: Nenhum dado encontrado para este usuário. Iniciando com padrão.");
+            loadAllData();
+            updateStatus("Pronto (Novo Perfil)", "normal");
+        }
+    } catch (error: any) {
+        console.error("Cloud Load: Erro.", error);
+        updateStatus("Erro no carregamento", "error");
+        
+        if (error.code === 'permission-denied') {
+            utils.showToast("Atenção: Acesso ao banco de dados bloqueado. Verifique as Regras do Firestore no console do Firebase.", "error");
+            isAutosaveDisabled = true; // Desativa autosave para evitar loop de erros
+        } else {
+            utils.showToast("Erro ao carregar dados da nuvem. Iniciando offline.", "error");
+        }
+        
+        loadAllData(); // Fallback para iniciar a aplicação mesmo com erro
+    }
+}
+
+/**
+ * Inicializa o sistema de Autosave.
+ * Ouve mudanças no estado (isDataDirty) e agenda o salvamento com debounce.
+ */
+export function initAutosave() {
+    state.subscribeToDirtyState((isDirty) => {
+        if (isDirty) {
+            updateStatus("Alterações pendentes...", "saving");
+            dom.cloudStatusIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="var(--text-secondary)" width="20" height="20"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>`; // Ícone de pausa/espera
+            dom.cloudStatusIcon.title = "Alterações não salvas...";
+
+            if (autosaveTimeout) clearTimeout(autosaveTimeout);
+            
+            autosaveTimeout = setTimeout(() => {
+                saveToCloud();
+            }, AUTOSAVE_DELAY);
+        }
+    });
+}
+
+/**
  * Manipula a exportação de todos os dados da aplicação para um arquivo JSON.
  */
 function handleExport() {
@@ -387,8 +532,7 @@ function handleExport() {
     a.click(); // Simula o clique no link para iniciar o download.
     URL.revokeObjectURL(a.href); // Libera a memória do objeto URL.
     
-    // Após a exportação, consideramos que os dados estão "salvos".
-    state.setDataDirty(false);
+    // Após a exportação, consideramos que os dados estão "salvos" (pelo menos localmente).
     utils.showToast('Exportação iniciada. O arquivo foi salvo.', 'success');
 }
 
@@ -438,12 +582,13 @@ function handleFileImport(event: Event) {
 
 /**
  * Confirma e executa a importação dos dados, substituindo os dados atuais.
+ * @param isCloudLoad Se verdadeiro, significa que os dados vieram da nuvem e não precisamos forçar um save imediato.
  */
-function confirmImport() {
+async function confirmImport(isCloudLoad = false) {
     if (!dataToImport) return;
-    utils.setButtonLoading(dom.confirmImportBtn, true);
+    if (dom.confirmImportBtn && !isCloudLoad) utils.setButtonLoading(dom.confirmImportBtn, true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
         // 1. FAZ UM BACKUP INTELIGENTE DO PROGRESSO DOS ALUNOS EXISTENTES
         const existingProgressMap = new Map<number, Progresso[]>();
         state.salas.forEach(sala => {
@@ -482,21 +627,13 @@ function confirmImport() {
         state.calendarioEventos.splice(0, state.calendarioEventos.length, ...eventosParaImportar);
 
         // 3. FAZ A FUSÃO (MERGE) DO PROGRESSO - PRESERVA DADOS
-        // Essa etapa combina IDs antigos com novos, mas AINDA pode gerar duplicatas
-        // se os IDs forem diferentes para o mesmo livro. A sanitização corrige isso depois.
         state.salas.forEach(sala => {
             sala.alunos.forEach(aluno => {
                 const oldProgress = existingProgressMap.get(aluno.id);
                 if (oldProgress) {
-                    // Usa um Map para garantir que o progresso de cada ID seja único.
                     const mergedProgressMap = new Map<number, Progresso>();
-                    
-                    // Adiciona o progresso antigo primeiro
                     oldProgress.forEach(p => mergedProgressMap.set(p.livroId, p));
-                    
-                    // Adiciona/sobrescreve com o progresso do arquivo importado
                     aluno.progresso.forEach(p => {
-                        // Se já existe dados para este ID, tenta manter o melhor (não sobrescreve com nulos)
                         if(mergedProgressMap.has(p.livroId)) {
                             const existing = mergedProgressMap.get(p.livroId)!;
                             existing.notaWritten = p.notaWritten ?? existing.notaWritten;
@@ -504,28 +641,39 @@ function confirmImport() {
                             existing.notaParticipation = p.notaParticipation ?? existing.notaParticipation;
                             existing.historicoPresencas = Math.max(existing.historicoPresencas || 0, p.historicoPresencas || 0) || undefined;
                             existing.historicoAulasDadas = Math.max(existing.historicoAulasDadas || 0, p.historicoAulasDadas || 0) || undefined;
-                            // (Mantém o objeto fundido no map)
                         } else {
                             mergedProgressMap.set(p.livroId, p);
                         }
                     });
-
                     aluno.progresso = Array.from(mergedProgressMap.values());
                 }
             });
         });
 
-        // 4. HIGIENIZAÇÃO E DEDUPLICAÇÃO POR NOME (A CORREÇÃO DEFINITIVA)
+        // 4. HIGIENIZAÇÃO E DEDUPLICAÇÃO
         deduplicateAndSanitizeProgress();
         
-        state.setDataDirty(false);
+        state.setDataDirty(false); // Reseta a flag suja
         
         renderAllViews();
         populateMobileMenu();
+        
+        // Garante que o usuário vá para o dashboard após carregar os dados
+        // (tanto para importação manual quanto carregamento da nuvem)
         switchView('dashboard');
         
-        utils.setButtonLoading(dom.confirmImportBtn, false);
-        utils.showToast('Dados importados e otimizados!', 'success');
+        if (dom.confirmImportBtn && !isCloudLoad) utils.setButtonLoading(dom.confirmImportBtn, false);
+        
+        if (!isCloudLoad) {
+            // Se foi uma importação manual de arquivo, força o salvamento na nuvem imediatamente
+            // para que a persistência seja garantida.
+            utils.showToast('JSON importado. Sincronizando com a nuvem...', 'warning');
+            await saveToCloud();
+        } else {
+            // Se veio da nuvem, só avisa
+            utils.showToast('Dados carregados com sucesso!', 'success');
+        }
+        
         closeImportModal();
     }, 500);
 }
@@ -545,12 +693,15 @@ export function initDataHandlers() {
     dom.exportBtn?.addEventListener('click', handleExport);
     dom.importBtn?.addEventListener('click', () => dom.importFileInput.click());
     dom.importFileInput.addEventListener('change', handleFileImport);
-    dom.confirmImportBtn?.addEventListener('click', confirmImport);
+    dom.confirmImportBtn?.addEventListener('click', () => confirmImport(false)); // Manual import
     dom.cancelImportBtn?.addEventListener('click', closeImportModal);
     dom.importConfirmModal.addEventListener('click', (e) => { if (e.target === dom.importConfirmModal) closeImportModal(); });
     
+    // Inicia o Autosave listener
+    initAutosave();
+
     // Lógica para a funcionalidade de Arrastar e Soltar (Drag and Drop)
-    let dragCounter = 0; // Contador para lidar com eventos de 'dragenter' e 'dragleave' em elementos filhos.
+    let dragCounter = 0; 
     
     window.addEventListener('dragenter', (e) => {
         e.preventDefault();
@@ -563,13 +714,13 @@ export function initDataHandlers() {
     window.addEventListener('dragleave', (e) => {
         e.preventDefault();
         dragCounter--;
-        if (dragCounter === 0) { // Só esconde a sobreposição quando o cursor realmente sai da janela.
+        if (dragCounter === 0) { 
             dom.dragDropOverlay.classList.remove('visible');
         }
     });
     
     window.addEventListener('dragover', (e) => {
-        e.preventDefault(); // Prevenir o comportamento padrão do navegador é crucial para que o 'drop' funcione.
+        e.preventDefault();
     });
     
     window.addEventListener('drop', (e) => {
