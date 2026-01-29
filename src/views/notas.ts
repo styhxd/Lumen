@@ -1,3 +1,4 @@
+
 /*
  * =================================================================================
  * MÓDULO DA VIEW DE NOTAS E AVALIAÇÕES (src/views/notas.ts)
@@ -677,7 +678,14 @@ function generateBoletimHTML(aluno: Aluno, sala: Sala): string {
 function triggerPrint(htmlContent: string, title: string): Promise<void> {
     return new Promise((resolve) => {
         const originalTitle = document.title;
-        document.title = title;
+        
+        // FAILSAFE: Try-catch para modificação do document.title, que pode falhar em ambientes restritos (iframes/sandboxes)
+        try {
+            document.title = title;
+        } catch (e) {
+            console.warn("Não foi possível alterar o título do documento (provável ambiente restrito).", e);
+        }
+
         dom.printContainer.innerHTML = htmlContent;
 
         let printed = false;
@@ -687,7 +695,11 @@ function triggerPrint(htmlContent: string, title: string): Promise<void> {
             printed = true;
 
             dom.printContainer.innerHTML = '';
-            document.title = originalTitle;
+            
+            // FAILSAFE: Tenta restaurar o título
+            try {
+                document.title = originalTitle;
+            } catch (e) { /* Ignora erro na restauração */ }
 
             // Limpa os listeners
             if (window.matchMedia) {

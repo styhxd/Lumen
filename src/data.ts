@@ -374,6 +374,16 @@ function updateStatus(text: string, type: 'saving' | 'saved' | 'error' | 'normal
 }
 
 /**
+ * Remove recursivamente todas as chaves com valor `undefined` de um objeto.
+ * O Firestore não aceita `undefined`, então precisamos limpar os dados antes de salvar.
+ * O `JSON.stringify` ignora chaves com `undefined` por padrão, então parsear de volta
+ * cria um objeto limpo.
+ */
+function sanitizeData(data: any): any {
+    return JSON.parse(JSON.stringify(data));
+}
+
+/**
  * Salva todos os dados atuais na nuvem (Firestore).
  */
 export async function saveToCloud() {
@@ -410,7 +420,10 @@ export async function saveToCloud() {
             } 
         };
 
-        await setDoc(doc(db, "schools", user.uid), exportData);
+        // SANITIZAÇÃO CRÍTICA: Remove 'undefined' que quebram o Firestore
+        const cleanData = sanitizeData(exportData);
+
+        await setDoc(doc(db, "schools", user.uid), cleanData);
         
         state.setDataDirty(false);
         updateStatus("Salvo na nuvem", "saved");
