@@ -1,6 +1,10 @@
 
 
 
+
+
+
+
 /*
  * =================================================================================
  * LÚMEN - FOLHA DE ESTILO PRINCIPAL (index.css)
@@ -53,6 +57,10 @@
     --success-color-light: #16a34a;           /* Verde para sucesso. */
     --error-color-light: #dc2626;             /* Vermelho para erro. */
     --warning-color-light: #d97706;           /* Âmbar para aviso. */
+    
+    /* Variaveis para efeito 3D Tilt */
+    --card-rotate-x: 0deg;
+    --card-rotate-y: 0deg;
 }
 
 /* Aplicação das variáveis de acordo com o tema selecionado no elemento <html>. */
@@ -148,7 +156,7 @@ body {
 .triangle {
     position: absolute; background: var(--triangle-bg);
     clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-    transition: background 0.5s ease-in-out;
+    transition: background 0.5s ease-in-out, transform 0.5s ease-in-out, filter 0.5s ease-in-out, opacity 0.5s ease-in-out;
 }
 
 /* Definições de tamanho, posição e animação para cada triângulo. */
@@ -156,6 +164,15 @@ body {
 .triangle:nth-child(2) { width: 50vw; height: 50vw; top: 50%; left: 60%; animation: float2 40s ease-in-out infinite -5s; }
 .triangle:nth-child(3) { width: 30vw; height: 30vw; top: 80%; left: 15%; animation: float3 25s ease-in-out infinite -10s; }
 .triangle:nth-child(4) { width: 60vw; height: 60vw; top: -10%; left: 80%; animation: float2 50s ease-in-out infinite -15s; transform: rotate(120deg); }
+
+/* ESTADO DE LOGIN: TRIÂNGULOS INTENSOS */
+body.login-mode .triangle {
+    filter: drop-shadow(0 0 30px var(--primary-blue)); /* Brilho Neon */
+    opacity: 0.9; /* Mais visível */
+    animation-duration: 20s; /* Mais rápido */
+}
+body.login-mode .triangle:nth-child(1) { transform: scale(1.1); }
+body.login-mode .triangle:nth-child(2) { transform: scale(1.2) rotate(10deg); }
 
 /* Keyframes para as animações de flutuação dos triângulos. */
 @keyframes float1 {
@@ -182,9 +199,8 @@ body {
 
 /*
  * =================================================================================
- * LOGIN / LOCK SCREEN
+ * LOGIN / LOCK SCREEN (Super Redesign v3.1)
  * =================================================================================
- * Estilos para a tela de bloqueio que sobrepõe todo o conteúdo até o login.
  */
 #login-screen {
     position: fixed;
@@ -192,16 +208,17 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(10, 15, 31, 0.85); /* Fundo escuro com leve transparência */
-    backdrop-filter: blur(15px); /* Efeito Glassmorphism forte */
-    -webkit-backdrop-filter: blur(15px);
-    z-index: 9999; /* Garante que fique sobre tudo */
+    background: rgba(10, 15, 31, 0.4); /* Fundo mais transparente para destacar triângulos */
+    backdrop-filter: blur(10px); /* Blur reduzido no fundo geral para focar no card */
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 9999;
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.5s ease-in-out;
+    perspective: 1000px; /* Habilita o 3D para o Tilt */
 }
 
 #login-screen.visible {
@@ -210,16 +227,40 @@ body {
 }
 
 .login-card {
-    background: var(--bg-glass);
-    border: 1px solid var(--border-color);
-    padding: 2.5rem;
-    border-radius: 1.5rem;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+    background: rgba(15, 23, 42, 0.4); /* Transparência Extrema */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 3rem;
+    border-radius: 2rem;
+    box-shadow: 
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        inset 0 0 20px rgba(255, 255, 255, 0.05); /* Brilho interno */
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     text-align: center;
     position: relative;
     overflow: hidden;
+    backdrop-filter: blur(25px); /* Efeito Glass Forte no Cartão */
+    -webkit-backdrop-filter: blur(25px);
+    
+    /* Efeito Tilt 3D */
+    transform-style: preserve-3d;
+    transform: rotateX(var(--card-rotate-x)) rotateY(var(--card-rotate-y));
+    transition: transform 0.1s ease-out, box-shadow 0.3s ease;
+}
+
+/* Borda Brilhante Animada */
+.login-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 2rem;
+    padding: 2px;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.5;
 }
 
 .login-card::before {
@@ -229,26 +270,111 @@ body {
     left: 0;
     width: 100%;
     height: 4px;
-    background: linear-gradient(90deg, var(--primary-blue), var(--success-color));
+    background: linear-gradient(90deg, var(--primary-blue), #3b82f6);
+    transition: background 0.4s ease;
+    box-shadow: 0 0 15px var(--primary-blue); /* Neon Top Glow */
+}
+
+/* Modificador para o estado de Cadastro (Signup) */
+.login-card.is-signup::before {
+    background: linear-gradient(90deg, #8b5cf6, #10b981);
+    box-shadow: 0 0 15px #8b5cf6;
 }
 
 .login-title {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--primary-blue);
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #fff;
     margin-bottom: 0.5rem;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.3);
 }
 
 .login-subtitle {
-    color: var(--text-secondary);
-    margin-bottom: 2rem;
-    font-size: 0.9rem;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 2.5rem;
+    font-size: 0.95rem;
+    font-weight: 400;
 }
 
 .login-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
+}
+
+.login-form input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem;
+    border-radius: 0.75rem;
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.login-form input:focus {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
+}
+
+/* Password Toggle Icon */
+#password-toggle-btn {
+    transition: color 0.3s;
+    opacity: 0.7;
+}
+#password-toggle-btn:hover {
+    color: var(--primary-blue) !important;
+    opacity: 1;
+}
+
+/* Toggle Switch para "Manter Conectado" */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-blue);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
 }
 
 /*
@@ -260,6 +386,16 @@ body {
 .main-container {
     padding: 1rem; max-width: 1600px; margin: 0 auto; width: 100%;
     flex-grow: 1; display: flex; flex-direction: column;
+    /* Adicionado para transição suave de carregamento */
+    opacity: 1;
+    transition: opacity 0.6s ease-out;
+}
+
+/* Classe utilitária para esconder a UI principal antes da autenticação */
+.main-container.auth-hidden {
+    opacity: 0;
+    pointer-events: none;
+    display: none; /* Garante que não ocupe espaço ou seja clicável */
 }
 
 main { flex-grow: 1; margin-top: 1.5rem; }

@@ -1,4 +1,8 @@
 
+
+
+
+
 /*
  * =================================================================================
  * MÓDULO DE SELETORES DO DOM (src/dom.ts)
@@ -42,6 +46,7 @@ export const hamburgerMenu = document.querySelector('.hamburger-menu') as HTMLEl
 export const toastContainer = document.getElementById('toast-container') as HTMLElement;
 export const mainElement = document.querySelector('main') as HTMLElement;
 export const cloudStatusIcon = document.getElementById('cloud-status-icon') as HTMLElement; // Novo ícone de status
+export const mainContainer = document.querySelector('.main-container') as HTMLElement; // Referência ao container principal para controle de visibilidade
 
 // =================================================================================
 // ELEMENTOS DO RODAPÉ (USER INFO & STATUS)
@@ -54,12 +59,23 @@ export const footerLogoutBtn = document.getElementById('footer-logout-btn') as H
 // ELEMENTOS DE AUTENTICAÇÃO (LOGIN / LOCK SCREEN)
 // =================================================================================
 export const loginScreen = document.getElementById('login-screen') as HTMLElement;
+export const loginCard = document.querySelector('.login-card') as HTMLElement;
 export const loginForm = document.getElementById('login-form') as HTMLFormElement;
 export const loginEmailInput = document.getElementById('login-email') as HTMLInputElement;
 export const loginPasswordInput = document.getElementById('login-password') as HTMLInputElement;
+export const signupConfirmPasswordInput = document.getElementById('signup-confirm-password') as HTMLInputElement;
+export const signupConfirmGroup = document.getElementById('signup-confirm-group') as HTMLElement;
+export const rememberMeCheckbox = document.getElementById('remember-me') as HTMLInputElement;
+export const rememberMeGroup = document.getElementById('remember-me-group') as HTMLElement;
 export const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
 export const loginTitle = document.querySelector('.login-title') as HTMLElement;
 export const toggleAuthBtn = document.getElementById('toggle-auth') as HTMLElement;
+export const passwordToggleBtn = document.getElementById('password-toggle-btn') as HTMLButtonElement;
+
+// Logout Modal Elements
+export const logoutConfirmModal = document.getElementById('logout-confirm-modal') as HTMLElement;
+export const confirmLogoutBtn = document.getElementById('confirm-logout-btn') as HTMLButtonElement;
+export const cancelLogoutBtn = document.getElementById('cancel-logout-btn') as HTMLButtonElement;
 
 
 // =================================================================================
