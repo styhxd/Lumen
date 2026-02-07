@@ -10,8 +10,8 @@
  * =================================================================================
  */
 
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import * as firebaseApp from "firebase/app";
+import * as firebaseAuth from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Configuração do Firebase conforme sua captura de tela
@@ -25,10 +25,10 @@ const firebaseConfig = {
 };
 
 // Inicializa o Firebase
-const app = initializeApp(firebaseConfig);
+const app = firebaseApp.initializeApp(firebaseConfig);
 
 // Inicializa serviços
-const auth = getAuth(app);
+const auth = firebaseAuth.getAuth(app);
 const db = getFirestore(app);
 
 export { app, auth, db };

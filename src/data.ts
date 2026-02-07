@@ -10,7 +10,7 @@
  * - Funções de importação e exportação de dados via arquivos JSON.
  * - Lógica de arrastar e soltar (Drag and Drop) para importação.
  * - Validação e processamento de arquivos importados.
- * - PERSISTÊNCIA NA NUVEM (FIRESTORE) E AUTOSAVE.
+ * - PERSISTÊNCIA NA NUVEM (FIRESTORE) E AUTOSAVE (COM SHARDING HOT/COLD).
  * A centralização dessas responsabilidades garante consistência e facilita a
  * manutenção e a depuração de tudo que envolve a persistência de dados.
  * =================================================================================
@@ -28,7 +28,7 @@ import * as state from './state.ts';        // O estado global da aplicação (o
 import * as dom from './dom.ts';            // Seletores de elementos do DOM para interagir com a página.
 import * as utils from './utils.ts';        // Funções utilitárias, como exibir toasts e controlar o estado de loading de botões.
 import { populateMobileMenu, switchView } from './ui.ts'; // Funções para atualizar componentes específicos da UI.
-import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso } from './types.ts';     // Tipos de dados para garantir a consistência.
+import { CalendarioEvento, Settings, Livro, Sala, Aluno, Progresso, Aula, Aviso } from './types.ts';     // Tipos de dados para garantir a consistência.
 import { db, auth } from './firebase.ts';   // Importação do Firestore e Auth
 import { doc, getDoc, setDoc } from "firebase/firestore"; // Funções do Firestore
 
@@ -384,11 +384,10 @@ function sanitizeData(data: any): any {
 }
 
 /**
- * Salva todos os dados atuais na nuvem (Firestore).
+ * SHARDING LOGIC: Salva os dados na nuvem, dividindo em documentos Quentes e Frios.
+ * Mantém histórico antigo em um documento separado para evitar limite de 1MB.
  */
 export async function saveToCloud() {
-    // Se o autosave estiver desativado, tentamos reativar para uma operação manual
-    // Mas se foi bloqueado por permissão, evitamos.
     if (isAutosaveDisabled && !auth.currentUser) {
         console.warn("Autosave: Desativado ou nenhum usuário logado.");
         return;
@@ -402,32 +401,100 @@ export async function saveToCloud() {
 
     try {
         updateStatus("Sincronizando...", "saving");
-        
         dom.cloudStatusIcon.innerHTML = `<div class="spinner" style="display:block; width:16px; height:16px; border-width:2px;"></div>`;
         dom.cloudStatusIcon.title = "Salvando na nuvem...";
 
-        const exportData = { 
-            lastUpdated: new Date().toISOString(), 
-            data: { 
-                settings: state.settings,
-                avisos: state.avisos, 
-                recursos: state.recursos, 
-                provas: state.provas, 
-                aulas: state.aulas, 
-                salas: state.salas, 
-                alunosParticulares: state.alunosParticulares, 
-                calendarioEventos: state.calendarioEventos,
-            } 
+        // --- LÓGICA DE CORTE (HOT/COLD SPLIT) ---
+        // Definimos o corte para 4 meses atrás. Dados mais antigos vão para o arquivo morto.
+        const cutoffDate = new Date();
+        cutoffDate.setMonth(cutoffDate.getMonth() - 4);
+        const cutoffString = cutoffDate.toISOString().split('T')[0];
+        const cutoffMonthString = cutoffString.substring(0, 7); // YYYY-MM
+
+        // 1. Separação de Aulas
+        const currentAulas: Aula[] = [];
+        const archivedAulas: Aula[] = [];
+        
+        state.aulas.forEach(a => {
+            if (a.date >= cutoffString) currentAulas.push(a);
+            else archivedAulas.push(a);
+        });
+
+        // 2. Separação de Salas
+        // Salas ativas ficam no principal. Finalizadas antigas vão para o arquivo.
+        const currentSalas: Sala[] = [];
+        const archivedSalas: Sala[] = [];
+
+        state.salas.forEach(s => {
+            if (s.status === 'ativa') {
+                currentSalas.push(s);
+            } else if (s.status === 'finalizada') {
+                // Se foi finalizada recentemente (dentro do corte), mantém no principal para fácil acesso
+                if (s.finalizacao && s.finalizacao.data >= cutoffString) {
+                    currentSalas.push(s);
+                } else {
+                    archivedSalas.push(s);
+                }
+            } else {
+                currentSalas.push(s); // Fallback
+            }
+        });
+
+        // 3. Separação de Calendário
+        const currentEventos: CalendarioEvento[] = [];
+        const archivedEventos: CalendarioEvento[] = [];
+        state.calendarioEventos.forEach(e => {
+            if (e.date >= cutoffString) currentEventos.push(e);
+            else archivedEventos.push(e);
+        });
+
+        // 4. Separação de Avisos (Mantém os 20 mais recentes no principal)
+        const sortedAvisos = [...state.avisos].sort((a, b) => b.date.localeCompare(a.date));
+        const currentAvisos = sortedAvisos.slice(0, 20);
+        const archivedAvisos = sortedAvisos.slice(20);
+
+        // --- PREPARAÇÃO DOS PACOTES DE DADOS ---
+
+        // Dados para o documento "Archive" (Frio)
+        const archivePayload = {
+            lastUpdated: new Date().toISOString(),
+            type: 'archive',
+            data: {
+                aulas: archivedAulas,
+                salas: archivedSalas,
+                calendarioEventos: archivedEventos,
+                avisos: archivedAvisos
+            }
         };
 
-        // SANITIZAÇÃO CRÍTICA: Remove 'undefined' que quebram o Firestore
-        const cleanData = sanitizeData(exportData);
+        // Dados para o documento "Principal" (Quente)
+        const mainPayload = {
+            lastUpdated: new Date().toISOString(),
+            type: 'main',
+            data: {
+                settings: state.settings,
+                recursos: state.recursos,
+                provas: state.provas,
+                alunosParticulares: state.alunosParticulares, // Geralmente pequeno, mantém tudo no main
+                aulas: currentAulas,
+                salas: currentSalas,
+                calendarioEventos: currentEventos,
+                avisos: currentAvisos
+            }
+        };
 
-        await setDoc(doc(db, "schools", user.uid), cleanData);
+        // --- EXECUÇÃO DO SALVAMENTO (ORDEM DE SEGURANÇA) ---
+        
+        // 1. Salva o ARQUIVO PRIMEIRO. Se falhar, abortamos e não tocamos no principal.
+        // Isso garante que não deletamos dados antigos do principal sem ter backup no arquivo.
+        await setDoc(doc(db, "schools", `${user.uid}_archive`), sanitizeData(archivePayload));
+
+        // 2. Salva o PRINCIPAL. Agora é seguro remover os dados antigos daqui.
+        await setDoc(doc(db, "schools", user.uid), sanitizeData(mainPayload));
         
         state.setDataDirty(false);
         updateStatus("Salvo na nuvem", "saved");
-        console.log("Autosave: Sucesso.");
+        console.log("Autosave: Sucesso (Split).");
         
         dom.cloudStatusIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="var(--success-color)" width="20" height="20"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
         dom.cloudStatusIcon.title = "Salvo na nuvem";
@@ -436,7 +503,6 @@ export async function saveToCloud() {
         console.error("Autosave: Erro ao salvar.", error);
         updateStatus("Erro ao salvar", "error");
         
-        // Se for erro de permissão, exibe um alerta específico e desativa o autosave
         if (error.code === 'permission-denied') {
             utils.showToast("Erro: Permissão negada no Firebase. Verifique as Regras do Firestore.", "error");
             isAutosaveDisabled = true;
@@ -450,19 +516,48 @@ export async function saveToCloud() {
 }
 
 /**
- * Carrega os dados da nuvem (Firestore) e atualiza o estado da aplicação.
+ * Carrega os dados da nuvem (Firestore) com suporte a Sharding (Principal + Arquivo).
+ * Reconstrói o estado global unificando os dados.
  */
 export async function loadFromCloud(uid: string) {
     try {
         updateStatus("Carregando dados...", "saving");
-        const docRef = doc(db, "schools", uid);
-        const docSnap = await getDoc(docRef);
+        
+        // Dispara as duas requisições em paralelo para performance
+        const [mainSnap, archiveSnap] = await Promise.all([
+            getDoc(doc(db, "schools", uid)),
+            getDoc(doc(db, "schools", `${uid}_archive`))
+        ]);
 
-        if (docSnap.exists()) {
-            const savedData = docSnap.data();
-            dataToImport = savedData.data; // Usa a mesma estrutura da importação de arquivo
-            confirmImport(true); // true indica que é carregamento da nuvem (não força um save imediato)
-            console.log("Cloud Load: Sucesso.");
+        if (mainSnap.exists()) {
+            const mainData = mainSnap.data().data || {};
+            const archiveData = archiveSnap.exists() ? (archiveSnap.data().data || {}) : {};
+
+            // Constrói o objeto de dados unificado
+            // Se o arquivo não existir (usuário antigo ou novo), usa arrays vazios
+            const fullData = {
+                settings: mainData.settings,
+                recursos: mainData.recursos || [],
+                provas: mainData.provas || [],
+                alunosParticulares: mainData.alunosParticulares || [],
+                
+                // Merge dos Arrays divididos
+                aulas: [...(mainData.aulas || []), ...(archiveData.aulas || [])],
+                salas: [...(mainData.salas || []), ...(archiveData.salas || [])],
+                calendarioEventos: [...(mainData.calendarioEventos || []), ...(archiveData.calendarioEventos || [])],
+                avisos: [...(mainData.avisos || []), ...(archiveData.avisos || [])]
+            };
+
+            // Remove duplicatas por ID (caso ocorra algum erro de sincronia e o item exista nos dois)
+            fullData.aulas = Array.from(new Map(fullData.aulas.map((item: any) => [item.id, item])).values());
+            fullData.salas = Array.from(new Map(fullData.salas.map((item: any) => [item.id, item])).values());
+            fullData.calendarioEventos = Array.from(new Map(fullData.calendarioEventos.map((item: any) => [item.id, item])).values());
+            fullData.avisos = Array.from(new Map(fullData.avisos.map((item: any) => [item.id, item])).values());
+
+            dataToImport = fullData; // Usa a estrutura padrão de importação
+            confirmImport(true); // true = Cloud Load (não força save imediato)
+            
+            console.log("Cloud Load: Sucesso (Merged).");
             updateStatus("Dados carregados", "saved");
         } else {
             console.log("Cloud Load: Nenhum dado encontrado para este usuário. Iniciando com padrão.");
@@ -474,13 +569,13 @@ export async function loadFromCloud(uid: string) {
         updateStatus("Erro no carregamento", "error");
         
         if (error.code === 'permission-denied') {
-            utils.showToast("Atenção: Acesso ao banco de dados bloqueado. Verifique as Regras do Firestore no console do Firebase.", "error");
-            isAutosaveDisabled = true; // Desativa autosave para evitar loop de erros
+            utils.showToast("Atenção: Acesso ao banco de dados bloqueado. Verifique as Regras do Firestore.", "error");
+            isAutosaveDisabled = true; 
         } else {
             utils.showToast("Erro ao carregar dados da nuvem. Iniciando offline.", "error");
         }
         
-        loadAllData(); // Fallback para iniciar a aplicação mesmo com erro
+        loadAllData(); // Fallback
     }
 }
 

@@ -1,8 +1,3 @@
-
-
-
-
-
 /*
  * =================================================================================
  * MÓDULO DE AUTENTICAÇÃO (src/auth.ts)
@@ -18,15 +13,7 @@
  * =================================================================================
  */
 
-import { 
-    onAuthStateChanged, 
-    signInWithEmailAndPassword, 
-    createUserWithEmailAndPassword, 
-    signOut,
-    setPersistence,
-    browserLocalPersistence,
-    browserSessionPersistence
-} from "firebase/auth";
+import * as Auth from "firebase/auth";
 import { auth } from "./firebase.ts";
 import * as dom from "./dom.ts";
 import * as utils from "./utils.ts";
@@ -40,7 +27,7 @@ let isRegistering = false; // Controle de estado: Login vs Cadastro
  */
 export function initAuth() {
     // 1. Monitoramento de Estado (Observer)
-    onAuthStateChanged(auth, (user) => {
+    Auth.onAuthStateChanged(auth, (user) => {
         // SEGURANÇA VISUAL: Para o spinner sempre que o estado muda
         utils.setButtonLoading(dom.loginBtn, false);
 
@@ -184,20 +171,20 @@ export function initAuth() {
                     return;
                 }
 
-                await createUserWithEmailAndPassword(auth, email, password);
+                await Auth.createUserWithEmailAndPassword(auth, email, password);
                 utils.showToast("Conta criada com sucesso! Bem-vindo.", "success");
             } else {
                 // LOGIN
                 
                 // Configura persistência ANTES do login (AWAIT É CRUCIAL AQUI)
                 const rememberMe = dom.rememberMeCheckbox.checked;
-                const persistenceMode = rememberMe ? browserLocalPersistence : browserSessionPersistence;
+                const persistenceMode = rememberMe ? Auth.browserLocalPersistence : Auth.browserSessionPersistence;
                 
                 // Força a definição da persistência e aguarda a conclusão
-                await setPersistence(auth, persistenceMode);
+                await Auth.setPersistence(auth, persistenceMode);
                 
                 // Só depois tenta logar
-                await signInWithEmailAndPassword(auth, email, password);
+                await Auth.signInWithEmailAndPassword(auth, email, password);
                 
                 utils.showToast("Acesso autorizado. Bem-vindo.", "success");
             }
@@ -246,7 +233,7 @@ export function initAuth() {
             // Oculta a UI principal imediatamente para evitar acesso pós-logout
             if (dom.mainContainer) dom.mainContainer.classList.add('auth-hidden');
             
-            await signOut(auth);
+            await Auth.signOut(auth);
             
             dom.logoutConfirmModal.classList.remove('visible');
             utils.setButtonLoading(dom.confirmLogoutBtn, false);
