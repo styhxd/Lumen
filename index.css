@@ -5,6 +5,8 @@
 
 
 
+
+
 /*
  * =================================================================================
  * LÚMEN - FOLHA DE ESTILO PRINCIPAL (index.css)
@@ -850,7 +852,7 @@ footer { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); f
 
 /* Notificações "Toast" para feedback rápido ao usuário. */
 #toast-container {
-    position: fixed; top: 1rem; right: 1rem; z-index: 2000;
+    position: fixed; top: 1rem; right: 1rem; z-index: 10000; /* ELEVADO PARA FICAR ACIMA DO LOGIN */
     display: flex; flex-direction: column; gap: 0.5rem;
     align-items: flex-end;
 }

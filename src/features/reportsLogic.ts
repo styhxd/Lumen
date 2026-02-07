@@ -32,13 +32,19 @@ export function calculateGlobalStats() {
         let gradeCount = 0;
 
         student.progresso.forEach(p => {
-            if (p.notaWritten !== null && p.notaWritten !== undefined) {
-                studentGrades.push(p.notaWritten);
-                gradeCount++;
-            }
-            if (p.notaOral !== null && p.notaOral !== undefined) {
-                studentGrades.push(p.notaOral);
-                gradeCount++;
+            // Filtra Bônus (Notas solitárias <= 5.0) para não distorcer a estatística global
+            const validExams = [p.notaWritten, p.notaOral].filter(n => n !== null && n !== undefined) as number[];
+            const isBonusEntry = validExams.length === 1 && validExams[0] <= 5.0 && (p.notaParticipation === null || p.notaParticipation === undefined);
+
+            if (!isBonusEntry) {
+                if (p.notaWritten !== null && p.notaWritten !== undefined) {
+                    studentGrades.push(p.notaWritten);
+                    gradeCount++;
+                }
+                if (p.notaOral !== null && p.notaOral !== undefined) {
+                    studentGrades.push(p.notaOral);
+                    gradeCount++;
+                }
             }
         });
 
@@ -119,42 +125,55 @@ export function calculateClassStats(salaId: number) {
         // Acumuladores do aluno
         let totalBookAverages = 0;
         let booksCountedForGrades = 0;
+        let bonusPointsAccumulator = 0; // Acumulador de pontos extras
         
         let totalPresencas = 0;
         let totalAulas = 0;
 
         student.progresso.forEach(p => {
-            const notasDoLivro: number[] = [];
+            const examGrades: number[] = [];
             
-            // Verifica existência de notas ACADÊMICAS reais
             const hasWritten = p.notaWritten !== null && p.notaWritten !== undefined;
             const hasOral = p.notaOral !== null && p.notaOral !== undefined;
-            const hasAcademicGrade = hasWritten || hasOral;
+            const hasParticipation = p.notaParticipation !== null && p.notaParticipation !== undefined;
 
-            if (hasWritten) {
-                notasDoLivro.push(p.notaWritten!);
-                globalWrittenSum += p.notaWritten!;
-                globalWrittenCount++;
-            }
-            if (hasOral) {
-                notasDoLivro.push(p.notaOral!);
-                globalOralSum += p.notaOral!;
-                globalOralCount++;
-            }
-            if (p.notaParticipation !== null && p.notaParticipation !== undefined) {
-                notasDoLivro.push(p.notaParticipation);
+            // --- LÓGICA DE DETECÇÃO DE BÔNUS ---
+            // Se tiver apenas UMA nota acadêmica (Written ou Oral), e essa nota for pequena (<= 5.0),
+            // e NÃO tiver nota de participação (indicando que o livro não acabou),
+            // tratamos como Ponto Extra Isolado.
+            const validExams = [p.notaWritten, p.notaOral].filter(n => n !== null && n !== undefined) as number[];
+            const isBonusEntry = validExams.length === 1 && validExams[0] <= 5.0 && !hasParticipation;
+
+            if (isBonusEntry) {
+                // É BÔNUS!
+                // Adiciona ao acumulador de bônus para o Ranking
+                bonusPointsAccumulator += validExams[0];
+                // NÃO adiciona às somas globais de média para não destruir o gráfico da turma
+                // A frequência (abaixo) conta normalmente.
+            } else {
+                // É REGISTRO DE LIVRO PADRÃO
+                if (hasWritten) {
+                    examGrades.push(p.notaWritten!);
+                    globalWrittenSum += p.notaWritten!;
+                    globalWrittenCount++;
+                }
+                if (hasOral) {
+                    examGrades.push(p.notaOral!);
+                    globalOralSum += p.notaOral!;
+                    globalOralCount++;
+                }
+                if (hasParticipation) {
+                    examGrades.push(p.notaParticipation!);
+                }
+
+                if (examGrades.length > 0) {
+                    const bookAvg = calculateAverage(examGrades);
+                    totalBookAverages += bookAvg;
+                    booksCountedForGrades++;
+                }
             }
 
-            // --- FAILSAFE DE MÉDIA ---
-            // Um livro SÓ entra na conta da média se tiver nota de Prova (Written ou Oral).
-            // Se tiver apenas nota de Participação, ignoramos para a média (mas contamos a frequência abaixo).
-            // Isso evita que pontos de aula inflem a média ou distorçam o ranking.
-            if (hasAcademicGrade && notasDoLivro.length > 0) {
-                totalBookAverages += calculateAverage(notasDoLivro);
-                booksCountedForGrades++;
-            }
-
-            // 2. Cálculo de Presença (Acumulativo) - A frequência conta mesmo sem provas
+            // 2. Cálculo de Presença (Acumulativo) - Conta SEMPRE, mesmo sendo bônus
             const aulas = (p.manualAulasDadas || p.historicoAulasDadas || 0);
             const presencas = (p.manualPresencas || p.historicoPresencas || 0);
             totalAulas += aulas;
@@ -166,33 +185,32 @@ export function calculateClassStats(salaId: number) {
         const attendancePercent = totalAulas > 0 ? (totalPresencas / totalAulas) : 0; // 0.0 a 1.0
 
         // --- ALGORITMO DE RANKING REFINADO (XP SYSTEM) ---
-        // Pesos: 70% Notas (Eficácia), 30% Presença (Assiduidade)
+        // Pesos: 70% Notas (Eficácia), 30% Presença (Assiduidade) + BÔNUS DIRETO
         const gradeWeight = 70; 
         const attendanceWeight = 30;
         
         let engagementScore = 0;
 
         if (booksCountedForGrades > 0) {
-            // Cálculo Base: (Média * 7) + (%Presença * 30) -> Max 100
+            // Cálculo Base
             engagementScore = (academicAverage * (gradeWeight / 10)) + (attendancePercent * attendanceWeight);
-
-            // Fator de Consistência (Penalidade para Novatos)
-            if (booksCountedForGrades === 1) {
-                engagementScore = engagementScore * 0.85; 
-            }
         } else if (totalAulas > 0) {
-            // Caso: Aluno Novo sem notas de prova (apenas presença/participação)
-            // Teto máximo de 40 XP.
+            // Aluno novo só com presença
             engagementScore = (attendancePercent * 100) * 0.4;
         }
 
-        // Trava final
+        // ADICIONA OS PONTOS EXTRAS AO SCORE FINAL
+        // (Ex: Se o aluno tem média 9.0 -> Score ~93. Ganhou 2 pts extras -> Score 95)
+        engagementScore += bonusPointsAccumulator;
+
+        // Trava final visual
+        // engagementScore = Math.min(engagementScore, 100); // Removido limite 100 para permitir "Overachievers" se tiver muito bônus? Não, melhor manter 100 visualmente.
         engagementScore = Math.min(engagementScore, 100);
 
         return {
             name: student.nomeCompleto,
             score: engagementScore, 
-            avgGrade: academicAverage,
+            avgGrade: academicAverage, // Média "limpa" sem o bônus puxando pra baixo
             attendance: attendancePercent * 100
         };
     }).sort((a, b) => b.score - a.score);
@@ -233,7 +251,7 @@ export function calculateClassStats(salaId: number) {
         averageGrade: avgGrade,
         averageAttendance: avgAttendance.toFixed(1),
         skillsComparison: { written: avgWritten, oral: avgOral },
-        topStudents: studentScores.slice(0, 5),
+        topStudents: studentScores,
         cohesion: { label: cohesionLevel, color: cohesionColor }
     };
 }
@@ -252,10 +270,25 @@ export function calculateStudentStats(alunoId: number, salaId: number) {
 
     const historyData = sortedBooks.map(book => {
         const p = aluno.progresso.find(pr => pr.livroId === book.id);
-        if (!p || (p.notaWritten === null && p.notaOral === null)) return null;
+        if (!p) return null;
         
-        const avg = calculateAverage([p.notaWritten || 0, p.notaOral || 0].filter(n => n > 0));
-        return { label: book.nome.split(':')[0], value: avg };
+        // Verifica se é bônus
+        const validExams = [p.notaWritten, p.notaOral].filter(n => n !== null && n !== undefined) as number[];
+        const hasParticipation = p.notaParticipation !== null && p.notaParticipation !== undefined;
+        const isBonusEntry = validExams.length === 1 && validExams[0] <= 5.0 && !hasParticipation;
+
+        // Se for bônus, NÃO exibe no gráfico de linha histórico (pois seria uma queda falsa para 1.0 ou 2.0)
+        if (isBonusEntry) return null;
+
+        // Se não for bônus, calcula média normal
+        const exams = [p.notaWritten || 0, p.notaOral || 0].filter(n => n > 0);
+        if (hasParticipation) exams.push(p.notaParticipation!);
+        
+        if (exams.length > 0) {
+            return { label: book.nome.split(':')[0], value: calculateAverage(exams) };
+        }
+        
+        return null;
     }).filter(d => d !== null) as { label: string, value: number }[];
 
     // Dados para Radar
@@ -266,10 +299,21 @@ export function calculateStudentStats(alunoId: number, salaId: number) {
     let absPres = 0, absAulas = 0;
 
     aluno.progresso.forEach(p => {
-        if (p.notaWritten) { totalW += p.notaWritten; countW++; }
-        if (p.notaOral) { totalO += p.notaOral; countO++; }
-        if (p.notaParticipation) { totalP += p.notaParticipation; countP++; }
+        // Apenas para o Radar: Bônus também conta como prática de escrita/oral? 
+        // Sim, o aluno praticou. Mas para a MÉDIA do radar, pode distorcer.
+        // Vamos manter a lógica de Bônus fora das médias do Radar também para consistência.
         
+        const validExams = [p.notaWritten, p.notaOral].filter(n => n !== null && n !== undefined) as number[];
+        const hasParticipation = p.notaParticipation !== null && p.notaParticipation !== undefined;
+        const isBonusEntry = validExams.length === 1 && validExams[0] <= 5.0 && !hasParticipation;
+
+        if (!isBonusEntry) {
+            if (p.notaWritten) { totalW += p.notaWritten; countW++; }
+            if (p.notaOral) { totalO += p.notaOral; countO++; }
+            if (p.notaParticipation) { totalP += p.notaParticipation; countP++; }
+        }
+        
+        // Frequência conta SEMPRE
         absPres += (p.manualPresencas || p.historicoPresencas || 0);
         absAulas += (p.manualAulasDadas || p.historicoAulasDadas || 0);
     });
@@ -312,8 +356,16 @@ export function calculateRadarList() {
 
             let sum = 0, count = 0, absAulas = 0, absPres = 0;
             aluno.progresso.forEach(p => {
-                if (p.notaWritten) { sum += p.notaWritten; count++; }
-                if (p.notaOral) { sum += p.notaOral; count++; }
+                // Filtro de Bônus também aqui
+                const validExams = [p.notaWritten, p.notaOral].filter(n => n !== null && n !== undefined) as number[];
+                const hasParticipation = p.notaParticipation !== null && p.notaParticipation !== undefined;
+                const isBonusEntry = validExams.length === 1 && validExams[0] <= 5.0 && !hasParticipation;
+
+                if (!isBonusEntry) {
+                    if (p.notaWritten) { sum += p.notaWritten; count++; }
+                    if (p.notaOral) { sum += p.notaOral; count++; }
+                }
+                
                 absAulas += (p.manualAulasDadas || p.historicoAulasDadas || 0);
                 absPres += (p.manualPresencas || p.historicoPresencas || 0);
             });
