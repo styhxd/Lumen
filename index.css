@@ -7,6 +7,8 @@
 
 
 
+
+
 /*
  * =================================================================================
  * LÚMEN - FOLHA DE ESTILO PRINCIPAL (index.css)
@@ -201,7 +203,7 @@ body.login-mode .triangle:nth-child(2) { transform: scale(1.2) rotate(10deg); }
 
 /*
  * =================================================================================
- * LOGIN / LOCK SCREEN (Super Redesign v3.1)
+ * LOGIN / LOCK SCREEN (Super Redesign v3.2)
  * =================================================================================
  */
 #login-screen {
