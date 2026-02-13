@@ -238,14 +238,15 @@ function generateEvolutionChart(currentMonth: string): string {
         return `
             ${horistaHalo}
             <circle cx="${x}" cy="${y}" r="${dotRadius}" fill="var(--bg-color)" stroke="${dotStroke}" stroke-width="2" />
-            <text x="${x}" y="${y - 15}" text-anchor="middle" fill="var(--text-color)" font-size="13" font-weight="bold">R$${Math.round(d.value)}</text>
-            <text x="${x}" y="${y - 4}" text-anchor="middle" fill="var(--text-secondary)" font-size="10">${d.students} alunos</text>
-            <text x="${x}" y="${height - 15}" text-anchor="middle" fill="var(--text-secondary)" font-size="12" font-weight="500" style="text-transform: uppercase;">${d.label}</text>
+            <text x="${x}" y="${y - 20}" text-anchor="middle" fill="var(--text-color)" font-size="16" font-weight="bold" font-family="sans-serif">R$${Math.round(d.value)}</text>
+            <text x="${x}" y="${y - 6}" text-anchor="middle" fill="var(--text-secondary)" font-size="12" font-weight="bold" font-family="sans-serif">${d.students} alunos</text>
+            <text x="${x}" y="${height - 10}" text-anchor="middle" fill="var(--text-secondary)" font-size="14" font-weight="bold" font-family="sans-serif" style="text-transform: uppercase;">${d.label}</text>
         `;
     }).join('');
 
+    // Removido preserveAspectRatio="none" para evitar distorção da fonte
     return `
-        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" style="overflow: visible;">
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="overflow: visible;">
             <defs>
                 <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stop-color="var(--primary-blue)" stop-opacity="0.3"/>
